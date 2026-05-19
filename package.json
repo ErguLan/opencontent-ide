@@ -10,7 +10,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "server:install": "cd server && npm install",
+    "server:start": "cd server && node index.js"
   },
   "dependencies": {
     "react": "^19.2.0",

@@ -1,4 +1,5 @@
 /**
+/**
  * Settings Page
  * OpenContent IDE
  */
@@ -12,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import Icon, { ICONS } from '../../components/icons/Icon';
 import Button from '../../components/common/Button';
 import { ROUTES, PLANS, STORAGE_KEYS } from '../../config/constants';
+import { AI_CONFIG, SKILLS, getActiveSkill } from '../../services/ai';
 
 function Settings() {
     const DEFAULT_TIMEOUT_MS = 45000;
@@ -32,6 +34,24 @@ function Settings() {
         if (!Number.isFinite(stored)) return DEFAULT_TIMEOUT_MS;
         return Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, stored));
     });
+
+    // Ollama state
+    const [ollamaUrl, setOllamaUrl] = useState(
+        () => localStorage.getItem(STORAGE_KEYS.OLLAMA_URL) || AI_CONFIG.OLLAMA_BASE_URL || 'http://localhost:11434'
+    );
+    const [ollamaStatus, setOllamaStatus] = useState(null); // null | 'testing' | 'ok' | 'error'
+    const [ollamaModels, setOllamaModels] = useState([]);
+
+    // Custom model IDs
+    const [customTextModel, setCustomTextModel] = useState(
+        () => localStorage.getItem(STORAGE_KEYS.CUSTOM_TEXT_MODEL) || ''
+    );
+    const [customImageModel, setCustomImageModel] = useState(
+        () => localStorage.getItem(STORAGE_KEYS.CUSTOM_IMAGE_MODEL) || ''
+    );
+
+    // Active skill
+    const [activeSkill, setActiveSkill] = useState(() => getActiveSkill().id);
 
     const handleLogout = async () => {
         await logout();
@@ -59,6 +79,42 @@ function Settings() {
         const clamped = Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, Math.round(numeric)));
         setAiTimeoutMs(clamped);
         localStorage.setItem(STORAGE_KEYS.AI_TIMEOUT_MS, String(clamped));
+    };
+
+    const handleOllamaUrlChange = (url) => {
+        setOllamaUrl(url);
+        localStorage.setItem(STORAGE_KEYS.OLLAMA_URL, url);
+        setOllamaStatus(null);
+    };
+
+    const handleTestOllama = async () => {
+        setOllamaStatus('testing');
+        setOllamaModels([]);
+        try {
+            const res = await fetch(`${ollamaUrl}/api/tags`, { method: 'GET' });
+            if (!res.ok) throw new Error('Connection failed');
+            const data = await res.json();
+            const models = (data.models || []).map(m => m.name || m.model);
+            setOllamaModels(models);
+            setOllamaStatus('ok');
+        } catch {
+            setOllamaStatus('error');
+        }
+    };
+
+    const handleCustomTextModelChange = (value) => {
+        setCustomTextModel(value);
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_TEXT_MODEL, value);
+    };
+
+    const handleCustomImageModelChange = (value) => {
+        setCustomImageModel(value);
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_IMAGE_MODEL, value);
+    };
+
+    const handleSkillChange = (skillId) => {
+        setActiveSkill(skillId);
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_SKILL, skillId);
     };
 
     return (
@@ -250,6 +306,109 @@ function Settings() {
                                 <span className="timeout-unit">ms</span>
                                 <span className="timeout-preview">{Math.round(aiTimeoutMs / 1000)}s</span>
                             </div>
+                        </div>
+                    </section>
+
+                    {/* Ollama (Local Models) Section */}
+                    <section className="settings-section">
+                        <h2 className="section-title">Ollama (Local Models)</h2>
+
+                        <div className="setting-row setting-row-stacked">
+                            <div className="setting-info">
+                                <span className="setting-label">Ollama URL</span>
+                                <span className="setting-description">Point to your local Ollama instance for 100% offline AI.</span>
+                            </div>
+
+                            <div className="timeout-row">
+                                <input
+                                    type="text"
+                                    className="timeout-input"
+                                    style={{ flex: 1, minWidth: '200px' }}
+                                    value={ollamaUrl}
+                                    onChange={(e) => handleOllamaUrlChange(e.target.value)}
+                                    placeholder="http://localhost:11434"
+                                />
+                                <button
+                                    type="button"
+                                    className={`mode-option ${ollamaStatus === 'ok' ? 'active' : ''}`}
+                                    onClick={handleTestOllama}
+                                    disabled={ollamaStatus === 'testing'}
+                                >
+                                    {ollamaStatus === 'testing' ? 'Testing...' : ollamaStatus === 'ok' ? 'Connected' : ollamaStatus === 'error' ? 'Retry' : 'Test'}
+                                </button>
+                            </div>
+
+                            {ollamaStatus === 'ok' && ollamaModels.length > 0 && (
+                                <div className="mode-options" style={{ marginTop: '8px' }}>
+                                    {ollamaModels.map(m => (
+                                        <span key={m} className="mode-option active" style={{ cursor: 'default', fontSize: '12px' }}>
+                                            {m}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                            {ollamaStatus === 'error' && (
+                                <span className="setting-description" style={{ color: 'var(--color-error, #f44)' }}>
+                                    Could not connect to Ollama. Make sure it is running.
+                                </span>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* Custom Models Section */}
+                    <section className="settings-section">
+                        <h2 className="section-title">Custom Models</h2>
+                        <span className="setting-description" style={{ marginBottom: '12px', display: 'block' }}>
+                            Paste any model ID from OpenRouter (e.g. google/gemini-2.5-flash) or Ollama (e.g. llama3).
+                        </span>
+
+                        <div className="setting-row setting-row-stacked">
+                            <div className="setting-info">
+                                <span className="setting-label">Custom Text Model</span>
+                            </div>
+                            <input
+                                type="text"
+                                className="timeout-input"
+                                style={{ width: '100%' }}
+                                value={customTextModel}
+                                onChange={(e) => handleCustomTextModelChange(e.target.value)}
+                                placeholder="e.g. google/gemini-2.5-flash or llama3"
+                            />
+                        </div>
+
+                        <div className="setting-row setting-row-stacked" style={{ marginTop: '8px' }}>
+                            <div className="setting-info">
+                                <span className="setting-label">Custom Image Model</span>
+                            </div>
+                            <input
+                                type="text"
+                                className="timeout-input"
+                                style={{ width: '100%' }}
+                                value={customImageModel}
+                                onChange={(e) => handleCustomImageModelChange(e.target.value)}
+                                placeholder="e.g. bytedance-seed/seedream-4.5"
+                            />
+                        </div>
+                    </section>
+
+                    {/* Skills / Personas Section */}
+                    <section className="settings-section">
+                        <h2 className="section-title">Skills / Personas</h2>
+                        <span className="setting-description" style={{ marginBottom: '12px', display: 'block' }}>
+                            Choose an AI persona that changes the agent behavior.
+                        </span>
+
+                        <div className="mode-options">
+                            {SKILLS.map(skill => (
+                                <button
+                                    key={skill.id}
+                                    type="button"
+                                    className={`mode-option ${activeSkill === skill.id ? 'active' : ''}`}
+                                    onClick={() => handleSkillChange(skill.id)}
+                                >
+                                    {skill.name}
+                                </button>
+                            ))}
                         </div>
                     </section>
 
