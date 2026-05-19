@@ -1,0 +1,189 @@
+{
+    "app": {
+        "name": "OpenContent IDE",
+        "tagline": "Crea contenido sin friccion"
+    },
+    "landing": {
+        "placeholder": "Que quieres crear hoy?",
+        "placeholderHints": [
+            "Un post para Instagram sobre mi negocio...",
+            "Una imagen profesional para mi marca...",
+            "Ideas de contenido para la semana...",
+            "Un carrusel explicando mi servicio..."
+        ],
+        "submit": "Crear",
+        "greeting": "Hola",
+        "poweredBy": "Impulsado por Agent"
+    },
+    "workspace": {
+        "editorShortcut": "Ir al editor",
+        "projects": "Proyectos",
+        "history": "Historial",
+        "newProject": "Nuevo Proyecto",
+        "untitled": "Sin titulo",
+        "generating": "Generando...",
+        "iterating": "Iterando...",
+        "complete": "Completado",
+        "actions": {
+            "save": "Guardar proyecto",
+            "export": "Exportar",
+            "publish": "Publicar",
+            "sendToAU": "Exportar",
+            "copy": "Copiar contenido",
+            "delete": "Eliminar proyecto",
+            "edit": "Editar",
+            "download": "Descargar imagen",
+            "generateImage": "Generar imagen"
+        },
+        "accessibility": {
+            "imageAlt": "Visual generado por IA",
+            "imageLoading": "Generando tu contenido visual...",
+            "statusUpdate": "Estado actual: "
+        },
+        "askChanges": "Pide cambios o mejoras...",
+        "result": {
+            "contentVisual": "Contenido + Visual",
+            "contentOnly": "Resultado"
+        },
+        "media": {
+            "title": "Plantillas y Assets",
+            "upload": "Subir",
+            "empty": "Sin archivos aun",
+            "limitTitle": "Limite de media alcanzado",
+            "limitFree": "Limite gratuito alcanzado (2 imagenes). Pasate a PRO para mas espacio.",
+            "limitPro": "Limite de media alcanzado (10 imagenes para PRO).",
+            "attach": "Adjuntar imagen de contexto"
+        },
+        "model": {
+            "title": "Modelos de IA",
+            "save": "Guardar modelos",
+            "change": "Cambiar modelo",
+            "short": "Modelos",
+            "textLabel": "Modelo de texto",
+            "imageLabel": "Modelo de imagen",
+            "textBestName": "Instant Best (Texto)",
+            "textFreeName": "Modelo adaptable (Texto)",
+            "visualBestName": "Instant Best (Visual)",
+            "visualFreeName": "Modelo adaptable (Visual)",
+            "textBestDesc": "Maxima calidad y coherencia de marca. En FREE esta limitado a 2 usos diarios; en PRO se desbloquea el flujo completo.",
+            "textFreeDesc": "Rapido y flexible para iterar ideas sin pensar en configuraciones. Ideal para borradores y variaciones.",
+            "visualBestDescFree": "Look mas premium. En FREE: 5 imagenes nuevas y 2 modificaciones por dia.",
+            "visualBestDescPro": "Look mas premium, pensado para piezas finales y consistencia. En PRO no te frena el flujo.",
+            "visualFreeDesc": "Rapido para exploracion visual y conceptos. Perfecto para probar estilos y variantes.",
+            "glmHint": "FREE: Instant Best (Texto) permite 2 usos diarios. Usa el modelo adaptable para seguir.",
+            "seedreamHint": "Instant Best (Visual): 5 imagenes nuevas y 2 modificaciones por dia.",
+            "glmLimitTitle": "Limite del modelo de texto",
+            "glmLimitMessage": "En FREE puedes usar Instant Best (Texto) 2 veces por dia. Cambia al modelo adaptable o subete a PRO.",
+            "seedreamNewLimitTitle": "Limite del modelo visual",
+            "seedreamNewLimitMessage": "Instant Best (Visual) permite 5 imagenes nuevas diarias. Cambia al modelo adaptable para seguir.",
+            "seedreamEditLimitTitle": "Limite de modificaciones visuales",
+            "seedreamEditLimitMessage": "Instant Best (Visual) permite 2 modificaciones diarias. Cambia al modelo adaptable o usa PRO."
+        },
+        "publish": {
+            "title": "Listo para publicar",
+            "message": "Guardamos esta publicacion en tu cola local. El siguiente paso es conectar destinos reales y automatizaciones."
+        },
+        "au": {
+            "title": "Exportar (en espera)",
+            "message": "Esta integracion esta en espera. Cuando me pases el MD del flujo de AU, la conectamos con un click."
+        }
+    },
+    "settings": {
+        "title": "Configuracion",
+        "theme": {
+            "title": "Tema",
+            "light": "Claro",
+            "dark": "Oscuro"
+        },
+        "language": {
+            "title": "Idioma",
+            "es": "Espanol",
+            "en": "English"
+        },
+        "account": {
+            "title": "Cuenta",
+            "plan": "Plan",
+            "free": "Gratis",
+            "pro": "PRO",
+            "logout": "Cerrar sesion",
+            "login": "Iniciar sesion"
+        }
+    },
+    "auth": {
+        "login": "Iniciar sesion",
+        "logout": "Cerrar sesion",
+        "loginWith": "Continuar con",
+        "google": "Google",
+        "email": "Correo electronico",
+        "password": "Contrasena",
+        "forgotPassword": "Olvidaste tu contrasena?",
+        "noAccount": "No tienes cuenta?",
+        "createAccount": "Crear cuenta",
+        "signUp": "Registrate",
+        "welcomeBack": "Bienvenido de nuevo"
+    },
+    "Agent": {
+        "name": "Agent",
+        "analyzing": "Analizando tu solicitud...",
+        "planning": "Planificando contenido...",
+        "generating": "Generando...",
+        "refining": "Refinando resultado...",
+        "complete": "Listo!"
+    },
+    "errors": {
+        "generic": "Algo salio mal",
+        "network": "Error de conexion",
+        "auth": "Error de autenticacion",
+        "notFound": "No encontrado"
+    },
+    "common": {
+        "loading": "Cargando...",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "confirm": "Confirmar",
+        "delete": "Eliminar",
+        "edit": "Editar",
+        "close": "Cerrar",
+        "back": "Volver",
+        "next": "Siguiente",
+        "retry": "Reintentar"
+    },
+    "pro": {
+        "cta": "Cambiate a PRO",
+        "ctaWithBenefits": "Cambiate a PRO para mayor acceso en OpenContent IDE",
+        "mini": "PRO: OpenContent IDE",
+        "modal": {
+            "title": "Desbloquea PRO",
+            "heroTitle": "Modo PRO para crear en serio",
+            "subtitle": "Con PRO obtienes mas potencia para crear, publicar y escalar tu contenido.",
+            "sectionStudioTitle": "STUDIO",
+            "sectionIdeTitle": "OpenContent IDE",
+            "sectionSiteTitle": "opencontent.ide",
+            "benefitIde": "Funciones exclusivas dentro de OpenContent IDE",
+            "benefitSite": "Ventajas exclusivas en opencontent.ide",
+            "benefitModels": "Mas libertad y mejor calidad en modelos",
+            "benefitLimits": "Mas iteraciones y limites mas altos para no cortar el flow",
+            "benefitWorkflow": "Workflows mas rapidos: crear, iterar, exportar y publicar",
+            "benefitProfile": "Perfil y ajustes avanzados para tu marca y tu equipo",
+            "noteRedirect": "Te llevamos a opencontent.ide para completar la compra y activar PRO en tu cuenta.",
+            "buy": "Comprar PRO"
+        }
+    },
+    "paywall": {
+        "defaultTitle": "Funcion disponible en PRO",
+        "defaultMessage": "Esta funcion requiere plan PRO.",
+        "dailyGenerationsTitle": "Limite diario alcanzado",
+        "dailyGenerationsMessage": "Ya llegaste al limite diario de generaciones. Pasate a PRO para seguir creando sin friccion.",
+        "iterationsTitle": "Limite de iteraciones",
+        "iterationsMessage": "Este proyecto ya alcanzo el maximo de iteraciones para tu plan actual.",
+        "dailyImagesTitle": "Limite diario de imagenes",
+        "dailyImagesMessage": "Ya consumiste tus imagenes del dia. Con PRO tienes mas capacidad de generacion visual.",
+        "dailyExportsTitle": "Limite diario de exportaciones",
+        "dailyExportsMessage": "Ya agotaste tus exportaciones diarias en FREE. Sube a PRO para exportar sin limites practicos.",
+        "dailyPublishesTitle": "Limite diario de publicacion",
+        "dailyPublishesMessage": "Ya alcanzaste tu publicacion diaria. Con PRO puedes publicar mas contenido.",
+        "projectsTitle": "Limite de proyectos",
+        "projectsMessage": "Tu plan FREE alcanzo el maximo de proyectos. Mejora a PRO para seguir creando sin borrar historial.",
+        "viewPlan": "Ver plan PRO"
+    }
+}

@@ -1,0 +1,15 @@
+/* =================================================
+   Starfield Effect Styles
+   ================================================= */
+
+#starfield-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    /* Lo subimos para que no quede detrás del color de fondo del body */
+    pointer-events: none;
+    display: block;
+}

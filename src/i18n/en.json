@@ -1,0 +1,189 @@
+{
+    "app": {
+        "name": "OpenContent IDE",
+        "tagline": "Create content without friction"
+    },
+    "landing": {
+        "placeholder": "What do you want to create today?",
+        "placeholderHints": [
+            "A post for Instagram about my business...",
+            "A professional image for my brand...",
+            "Content ideas for the week...",
+            "A carousel explaining my service..."
+        ],
+        "submit": "Create",
+        "greeting": "Hello",
+        "poweredBy": "Powered by Agent"
+    },
+    "workspace": {
+        "editorShortcut": "Go to editor",
+        "projects": "Projects",
+        "history": "History",
+        "newProject": "New Project",
+        "untitled": "Untitled",
+        "generating": "Generating...",
+        "iterating": "Iterating...",
+        "complete": "Complete",
+        "actions": {
+            "save": "Save",
+            "export": "Export",
+            "publish": "Publish",
+            "sendToAU": "Export",
+            "copy": "Copy",
+            "delete": "Delete",
+            "edit": "Edit",
+            "download": "Download Image",
+            "generateImage": "Generate Image"
+        },
+        "accessibility": {
+            "imageAlt": "AI Generated Visual",
+            "imageLoading": "Generating your visual content...",
+            "statusUpdate": "Current status: "
+        },
+        "askChanges": "Ask for changes or improvements...",
+        "result": {
+            "contentVisual": "Content + Visual",
+            "contentOnly": "Result"
+        },
+        "media": {
+            "title": "Templates & Assets",
+            "upload": "Upload",
+            "empty": "No assets yet",
+            "limitTitle": "Limit reached",
+            "limitFree": "Free limit reached (3 images). Upgrade to PRO for more storage!",
+            "limitPro": "Media limit reached (10 images for PRO).",
+            "attach": "Attach context image"
+        },
+        "model": {
+            "title": "AI Models",
+            "save": "Save models",
+            "change": "Change Model",
+            "short": "Model",
+            "textLabel": "Text model",
+            "imageLabel": "Image model",
+            "textBestName": "Instant Best (Text)",
+            "textFreeName": "Adaptive (Text)",
+            "visualBestName": "Instant Best (Visual)",
+            "visualFreeName": "Adaptive (Visual)",
+            "textBestDesc": "Highest quality and brand coherence. On FREE it is limited to 2 daily uses; PRO unlocks the full flow.",
+            "textFreeDesc": "Fast and flexible for iterating ideas without configuration. Great for drafts and variations.",
+            "visualBestDescFree": "More premium look. On FREE: 5 new images and 2 modifications per day.",
+            "visualBestDescPro": "More premium look for final assets and consistency. PRO keeps the flow unblocked.",
+            "visualFreeDesc": "Fast for visual exploration and concepts. Perfect for trying styles and variants.",
+            "glmHint": "FREE: Instant Best (Text) allows 2 daily uses. Use the adaptive model to keep going.",
+            "seedreamHint": "Instant Best (Visual): 5 new images and 2 modifications per day.",
+            "glmLimitTitle": "Text model limit",
+            "glmLimitMessage": "On FREE you can use Instant Best (Text) 2 times per day. Switch to the adaptive model or upgrade to PRO.",
+            "seedreamNewLimitTitle": "Visual model limit",
+            "seedreamNewLimitMessage": "Instant Best (Visual) allows 5 new images per day. Switch to the adaptive model to continue.",
+            "seedreamEditLimitTitle": "Visual edit limit",
+            "seedreamEditLimitMessage": "Instant Best (Visual) allows 2 modifications per day. Switch to the adaptive model or use PRO."
+        },
+        "publish": {
+            "title": "Ready to publish",
+            "message": "We saved this post in your local queue. Next step is connecting real destinations and automations."
+        },
+        "au": {
+            "title": "Export (waiting)",
+            "message": "This integration is on hold. Once you share the AU flow MD, we will wire it with one click."
+        }
+    },
+    "settings": {
+        "title": "Settings",
+        "theme": {
+            "title": "Theme",
+            "light": "Light",
+            "dark": "Dark"
+        },
+        "language": {
+            "title": "Language",
+            "es": "Spanish",
+            "en": "English"
+        },
+        "account": {
+            "title": "Account",
+            "plan": "Plan",
+            "free": "Free",
+            "pro": "PRO",
+            "logout": "Log out",
+            "login": "Log in"
+        }
+    },
+    "auth": {
+        "login": "Log in",
+        "logout": "Log out",
+        "loginWith": "Continue with",
+        "google": "Google",
+        "email": "Email",
+        "password": "Password",
+        "forgotPassword": "Forgot your password?",
+        "noAccount": "Don't have an account?",
+        "createAccount": "Create account",
+        "signUp": "Sign up",
+        "welcomeBack": "Welcome back"
+    },
+    "Agent": {
+        "name": "Agent",
+        "analyzing": "Analyzing your request...",
+        "planning": "Planning content...",
+        "generating": "Generating...",
+        "refining": "Refining result...",
+        "complete": "Done!"
+    },
+    "errors": {
+        "generic": "Something went wrong",
+        "network": "Connection error",
+        "auth": "Authentication error",
+        "notFound": "Not found"
+    },
+    "common": {
+        "loading": "Loading...",
+        "save": "Save",
+        "cancel": "Cancel",
+        "confirm": "Confirm",
+        "delete": "Delete",
+        "edit": "Edit",
+        "close": "Close",
+        "back": "Back",
+        "next": "Next",
+        "retry": "Retry"
+    },
+    "pro": {
+        "cta": "Upgrade to PRO",
+        "ctaWithBenefits": "Upgrade to PRO for greater access in OpenContent IDE",
+        "mini": "PRO: OpenContent IDE",
+        "modal": {
+            "title": "Unlock PRO",
+            "heroTitle": "PRO mode for serious creation",
+            "subtitle": "With PRO you get more power to create, publish, and scale your content.",
+            "sectionStudioTitle": "STUDIO",
+            "sectionIdeTitle": "OpenContent IDE",
+            "sectionSiteTitle": "opencontent.ide",
+            "benefitIde": "Exclusive features inside OpenContent IDE",
+            "benefitSite": "Exclusive benefits on opencontent.ide",
+            "benefitModels": "More freedom and better model quality",
+            "benefitLimits": "More iterations and higher limits to keep your flow unblocked",
+            "benefitWorkflow": "Faster workflows: create, iterate, export, publish",
+            "benefitProfile": "Advanced profile and brand settings for teams",
+            "noteRedirect": "We will take you to opencontent.ide to complete purchase and activate PRO on your account.",
+            "buy": "Buy PRO"
+        }
+    },
+    "paywall": {
+        "defaultTitle": "Feature available on PRO",
+        "defaultMessage": "This feature requires a PRO plan.",
+        "dailyGenerationsTitle": "Daily limit reached",
+        "dailyGenerationsMessage": "You reached your daily generation limit. Upgrade to PRO to keep creating without friction.",
+        "iterationsTitle": "Iteration limit",
+        "iterationsMessage": "This project already reached the max iterations for your current plan.",
+        "dailyImagesTitle": "Daily image limit",
+        "dailyImagesMessage": "You consumed your daily images. PRO gives you more visual generation capacity.",
+        "dailyExportsTitle": "Daily export limit",
+        "dailyExportsMessage": "You used all daily exports on FREE. Upgrade to PRO to export with practical no limits.",
+        "dailyPublishesTitle": "Daily publish limit",
+        "dailyPublishesMessage": "You reached your daily publish limit. PRO lets you publish more content.",
+        "projectsTitle": "Project limit",
+        "projectsMessage": "Your FREE plan reached the max projects. Upgrade to PRO to continue creating without deleting history.",
+        "viewPlan": "View PRO plan"
+    }
+}

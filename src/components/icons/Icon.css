@@ -1,0 +1,64 @@
+/* =================================================
+   Icon Component Styles
+   ================================================= */
+
+.icon {
+    display: inline-block;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.icon-clickable {
+    cursor: pointer;
+}
+
+.icon-clickable:hover {
+    opacity: 0.8;
+}
+
+.icon-clickable:active {
+    opacity: 0.6;
+    transform: scale(0.95);
+}
+
+.icon-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.icon-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-bg-tertiary);
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+}
+
+/* Hover Animations */
+.icon-hover-bounce:hover {
+    animation: iconBounce 0.4s ease;
+}
+
+.icon-hover-pop:hover {
+    animation: iconPop 0.3s ease;
+}
+
+.icon-hover-shake:hover {
+    animation: iconShake 0.4s ease;
+}
+
+.icon-hover-spin:hover {
+    animation: spin 0.5s ease;
+}
+
+/* Loading state */
+.icon-loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
