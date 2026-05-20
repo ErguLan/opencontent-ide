@@ -1,0 +1,10 @@
+{
+  "name": "opencontent-ide-mcp",
+  "type": "module",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MCP Tool Provider for OpenContent IDE",
+  "bin": {
+    "opencontent-mcp": "./index.js"
+  }
+}

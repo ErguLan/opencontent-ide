@@ -1,5 +1,10 @@
 # OpenContent IDE
 
+[![CI](https://github.com/ErguLan/opencontent-ide/actions/workflows/ci.yml/badge.svg)](https://github.com/ErguLan/opencontent-ide/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 > Open source AI content creation studio. Self-hosted. BYOK. Ollama-compatible.
 
 **OpenContent IDE** is a self-hosted, open-source content creation IDE powered by AI. Think "Cursor, but for social media content." Generate text, images, and creative assets using your own API keys or local models via Ollama.
@@ -12,8 +17,13 @@
 - **Ollama Support** — Run 100% locally with your own GPU. No API keys needed.
 - **Skills System** — Switchable AI personas (Content Creator, SEO Writer, Copywriter, etc.)
 - **Local-First** — All data stored in your browser (IndexedDB). Nothing leaves your machine.
+- **Chat Memory** — Persistent conversation history per project.
+- **Copy as API** — Generate curl/JS/Python snippets from any prompt.
+- **API Server Mode** — REST API with OpenAI-compatible endpoint.
+- **MCP Tool Provider** — Use as an AI tool from Claude, Gemini, etc.
 - **Dark/Light Mode** — Beautiful, minimal UI with theme support.
 - **i18n** — English and Spanish out of the box.
+- **Docker Ready** — One-click deploy with Docker Compose.
 - **Export** — Download your projects as JSON or images.
 - **Version History** — Iterate on content with full version tracking.
 
@@ -24,7 +34,7 @@
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/opencontent-ide.git
+git clone https://github.com/ErguLan/opencontent-ide.git
 cd opencontent-ide
 npm install
 ```
@@ -59,6 +69,49 @@ Set `VITE_OLLAMA_BASE_URL=http://localhost:11434` in your `.env` file. Models wi
 
 ---
 
+## API Server Mode
+
+Run the headless API server for integration with n8n, LangChain, Make, etc.:
+
+```bash
+npm run server:install
+OPENROUTER_API_KEY=sk-... npm run server:start
+```
+
+**Endpoints:**
+
+| Method | URL | Description |
+|--------|-----|-------------|
+| POST | `/api/generate` | Generate text content |
+| POST | `/api/generate-image` | Generate an image |
+| GET | `/api/models` | List available models |
+| GET | `/api/health` | Health check |
+| POST | `/v1/chat/completions` | OpenAI-compatible endpoint |
+
+---
+
+## MCP Tool Provider
+
+Use OpenContent IDE as a tool from AI agents:
+
+```json
+{
+  "mcpServers": {
+    "opencontent": {
+      "command": "node",
+      "args": ["path/to/opencontent-ide/mcp/index.js"],
+      "env": {
+        "OPENROUTER_API_KEY": "your-key"
+      }
+    }
+  }
+}
+```
+
+**Available MCP Tools:** `generate_content`, `generate_image`, `list_skills`, `list_models`
+
+---
+
 ## Supported Providers
 
 | Provider | Text | Images | Local | Free Tier |
@@ -71,7 +124,7 @@ Set `VITE_OLLAMA_BASE_URL=http://localhost:11434` in your `.env` file. Models wi
 
 ## Skills / Personas
 
-OpenContent IDE uses a **Skills** system — switchable AI personas that change the agent's behavior:
+Switchable AI personas that change the agent's behavior:
 
 | Skill | Description |
 |-------|-------------|
@@ -89,16 +142,23 @@ Add your own skills by editing `src/data/skills.json`.
 ## Project Structure
 
 ```
-src/
-├── config/           # Constants, feature flags
-├── context/          # React contexts (Auth, Theme, Language)
-├── data/             # Skills/personas JSON
-├── features/         # Pages (Landing, Workspace, Settings)
-├── components/       # Reusable UI components
-├── services/         # AI service, local storage, media
-├── styles/           # CSS variables, animations
-├── i18n/             # Translations (EN/ES)
-└── utils/            # Helpers, image processing
+├── src/                  # Frontend (React + Vite)
+│   ├── config/           # Constants, feature flags
+│   ├── context/          # React contexts (Auth, Theme, Language)
+│   ├── data/             # Skills/personas JSON
+│   ├── features/         # Pages + decomposed components & hooks
+│   ├── components/       # Reusable UI components
+│   ├── services/         # AI, chat history, media, metrics, copyAsApi
+│   ├── styles/           # CSS variables, animations
+│   ├── i18n/             # Translations (EN/ES)
+│   └── utils/            # Helpers, image processing
+├── server/               # API Server (Express)
+│   ├── routes/           # REST endpoints
+│   └── lib/              # Shared provider logic
+├── mcp/                  # MCP Tool Provider (stdio)
+├── Dockerfile            # Multi-stage Docker build
+├── docker-compose.yml    # One-click deployment
+└── .github/workflows/    # CI pipeline
 ```
 
 ---
@@ -135,13 +195,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - [x] Skills/Personas system
 - [x] Local-first data storage
 - [x] i18n (EN/ES)
-- [ ] Ollama integration
-- [ ] API Server Mode (REST endpoints)
-- [ ] OpenAI-compatible endpoint (`/v1/chat/completions`)
-- [ ] Docker support
-- [ ] MCP Tool Provider
-- [ ] Chat with persistent memory
-- [ ] "Copy as API" button
+- [x] Ollama integration
+- [x] API Server Mode (REST endpoints)
+- [x] OpenAI-compatible endpoint (`/v1/chat/completions`)
+- [x] Docker support
+- [x] MCP Tool Provider
+- [x] Chat with persistent memory
+- [x] "Copy as API" button
+- [x] GitHub Actions CI
+- [ ] Streaming responses
+- [ ] Plugin system
+- [ ] More languages (PT, FR, DE)
+- [ ] GitHub Pages demo
 
 ---
 

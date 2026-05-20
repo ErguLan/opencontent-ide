@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "server:install": "cd server && npm install",
-    "server:start": "cd server && node index.js"
+    "server:start": "cd server && node index.js",
+    "mcp:start": "node mcp/index.js"
   },
   "dependencies": {
     "react": "^19.2.0",
