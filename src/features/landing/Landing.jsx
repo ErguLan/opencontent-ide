@@ -17,7 +17,7 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import Starfield from '../../components/effects/Starfield';
 import { ROUTES, STORAGE_KEYS } from '../../config/constants';
-import { AI_CONFIG, getTextModelOptions, getImageModelOptions } from '../../services/ai';
+import { AI_CONFIG, getTextModelOptions, getImageModelOptions, isAIConfigured } from '../../services/ai';
 
 function Landing() {
     const navigate = useNavigate();
@@ -198,10 +198,7 @@ function Landing() {
                         title={t('workspace.editorShortcut')}
                     >
                         <Icon
-                            src="/nav/editor.png"
-                            size="sm"
-                            alt="Editor"
-                            animation="pop"
+                            src={ICONS.EDIT_PEN}
                         />
                     </button>
 
@@ -277,14 +274,16 @@ function Landing() {
                         </div>
                     </form>
 
-                    <button
-                        className="pro-upgrade-cta"
-                        onClick={() => setShowProModal(true)}
-                        title={t('pro.cta')}
-                    >
-                        <Icon src={ICONS.PRO} size={22} alt="PRO" />
-                        <span>{t('pro.ctaWithBenefits')}</span>
-                    </button>
+                    {!isAIConfigured() && (
+                        <button
+                            className="pro-upgrade-cta"
+                            onClick={() => navigate(ROUTES.SETTINGS)}
+                            title="Setup API Keys"
+                        >
+                            <Icon src={ICONS.SETTINGS} size={18} />
+                            <span>Setup API Keys to start generating</span>
+                        </button>
+                    )}
                 </div>
             </main>
 
@@ -356,61 +355,7 @@ function Landing() {
                 </div>
             </Modal>
 
-            <Modal
-                isOpen={showProModal}
-                onClose={() => setShowProModal(false)}
-                title={t('pro.modal.title')}
-                className="modal-pro"
-                footer={(
-                    <>
-                        <Button variant="secondary" onClick={() => setShowProModal(false)}>
-                            {t('common.cancel')}
-                        </Button>
-                        <Button
-                            variant="primary"
-                            onClick={() => window.open('https://www.opencontent.ide/#settings?section=profile', '_blank', 'noopener,noreferrer')}
-                        >
-                            {t('pro.modal.buy')}
-                        </Button>
-                    </>
-                )}
-            >
-                <div className="pro-hero">
-                    <div className="pro-hero-badge">
-                        <Icon src={ICONS.PRO} size={28} alt="PRO" />
-                        <div className="pro-hero-title">{t('pro.modal.heroTitle')}</div>
-                    </div>
-                    <div className="pro-hero-sub">{t('pro.modal.subtitle')}</div>
-                </div>
 
-                <div className="pro-grid">
-                    <div className="pro-card">
-                        <div className="pro-card-title">{t('pro.modal.sectionStudioTitle')}</div>
-                        <ul className="pro-benefits-list">
-                            <li>{t('pro.modal.benefitModels')}</li>
-                            <li>{t('pro.modal.benefitLimits')}</li>
-                        </ul>
-                    </div>
-                    <div className="pro-card">
-                        <div className="pro-card-title">{t('pro.modal.sectionIdeTitle')}</div>
-                        <ul className="pro-benefits-list">
-                            <li>{t('pro.modal.benefitIde')}</li>
-                            <li>{t('pro.modal.benefitWorkflow')}</li>
-                        </ul>
-                    </div>
-                    <div className="pro-card">
-                        <div className="pro-card-title">{t('pro.modal.sectionSiteTitle')}</div>
-                        <ul className="pro-benefits-list">
-                            <li>{t('pro.modal.benefitSite')}</li>
-                            <li>{t('pro.modal.benefitProfile')}</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div className="pro-footnote">
-                    {t('pro.modal.noteRedirect')}
-                </div>
-            </Modal>
         </div>
     );
 }

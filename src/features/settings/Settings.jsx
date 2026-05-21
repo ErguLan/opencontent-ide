@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import Icon, { ICONS } from '../../components/icons/Icon';
 import Button from '../../components/common/Button';
 import { ROUTES, PLANS, STORAGE_KEYS } from '../../config/constants';
-import { AI_CONFIG, SKILLS, getActiveSkill } from '../../services/ai';
+import { AI_CONFIG, SKILLS, getActiveSkill, saveApiKey, getApiKey, isAIConfigured } from '../../services/ai';
 
 function Settings() {
     const DEFAULT_TIMEOUT_MS = 45000;
@@ -49,6 +49,25 @@ function Settings() {
     const [customImageModel, setCustomImageModel] = useState(
         () => localStorage.getItem(STORAGE_KEYS.CUSTOM_IMAGE_MODEL) || ''
     );
+
+    // API Keys state
+    const [orKey, setOrKey] = useState(() => getApiKey('openrouter'));
+    const [gmKey, setGmKey] = useState(() => getApiKey('gemini'));
+    const [oaKey, setOaKey] = useState(() => getApiKey('openai'));
+    const [showKeys, setShowKeys] = useState(false);
+    const [keySaved, setKeySaved] = useState(null);
+
+    const handleSaveKey = (provider, value, setter) => {
+        setter(value);
+        saveApiKey(provider, value);
+        setKeySaved(provider);
+        setTimeout(() => setKeySaved(null), 2000);
+    };
+
+    const maskKey = (key) => {
+        if (!key || key.length < 8) return key;
+        return key.substring(0, 6) + '•'.repeat(Math.min(20, key.length - 10)) + key.substring(key.length - 4);
+    };
 
     // Active skill
     const [activeSkill, setActiveSkill] = useState(() => getActiveSkill().id);
@@ -181,6 +200,84 @@ function Settings() {
                             </Button>
                         </section>
                     )}
+
+                    {/* API Keys Section */}
+                    <section className="settings-section">
+                        <h2 className="section-title">API Keys</h2>
+                        <span className="setting-description" style={{ marginBottom: '12px', display: 'block' }}>
+                            Configure your AI provider keys. Keys are stored locally in your browser — never sent to any server.
+                        </span>
+
+                        <div className="setting-row setting-row-stacked">
+                            <div className="setting-info">
+                                <span className="setting-label">OpenRouter API Key</span>
+                                <span className="setting-description">Get yours free at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style={{color:'var(--color-primary)'}}>openrouter.ai/keys</a></span>
+                            </div>
+                            <div className="timeout-row">
+                                <input
+                                    type={showKeys ? 'text' : 'password'}
+                                    className="timeout-input"
+                                    style={{ flex: 1 }}
+                                    value={orKey}
+                                    onChange={e => handleSaveKey('openrouter', e.target.value, setOrKey)}
+                                    placeholder="sk-or-..."
+                                    autoComplete="off"
+                                />
+                                {keySaved === 'openrouter' && <span className="mode-option active" style={{cursor:'default',fontSize:'12px'}}>Saved</span>}
+                            </div>
+                        </div>
+
+                        <div className="setting-row setting-row-stacked" style={{marginTop: '8px'}}>
+                            <div className="setting-info">
+                                <span className="setting-label">Gemini API Key</span>
+                                <span className="setting-description">Get yours at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{color:'var(--color-primary)'}}>aistudio.google.com</a></span>
+                            </div>
+                            <div className="timeout-row">
+                                <input
+                                    type={showKeys ? 'text' : 'password'}
+                                    className="timeout-input"
+                                    style={{ flex: 1 }}
+                                    value={gmKey}
+                                    onChange={e => handleSaveKey('gemini', e.target.value, setGmKey)}
+                                    placeholder="AIza..."
+                                    autoComplete="off"
+                                />
+                                {keySaved === 'gemini' && <span className="mode-option active" style={{cursor:'default',fontSize:'12px'}}>Saved</span>}
+                            </div>
+                        </div>
+
+                        <div className="setting-row setting-row-stacked" style={{marginTop: '8px'}}>
+                            <div className="setting-info">
+                                <span className="setting-label">OpenAI API Key</span>
+                                <span className="setting-description">Optional — used via OpenRouter by default.</span>
+                            </div>
+                            <div className="timeout-row">
+                                <input
+                                    type={showKeys ? 'text' : 'password'}
+                                    className="timeout-input"
+                                    style={{ flex: 1 }}
+                                    value={oaKey}
+                                    onChange={e => handleSaveKey('openai', e.target.value, setOaKey)}
+                                    placeholder="sk-..."
+                                    autoComplete="off"
+                                />
+                                {keySaved === 'openai' && <span className="mode-option active" style={{cursor:'default',fontSize:'12px'}}>Saved</span>}
+                            </div>
+                        </div>
+
+                        <div className="timeout-row" style={{marginTop: '10px'}}>
+                            <button
+                                type="button"
+                                className="mode-option"
+                                onClick={() => setShowKeys(!showKeys)}
+                            >
+                                {showKeys ? 'Hide Keys' : 'Show Keys'}
+                            </button>
+                            <span className="setting-description" style={{marginLeft: '8px'}}>
+                                {isAIConfigured() ? '✓ At least one key configured' : '⚠ No API keys configured'}
+                            </span>
+                        </div>
+                    </section>
 
                     {/* Theme Section */}
                     <section className="settings-section">

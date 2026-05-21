@@ -4,23 +4,68 @@
  * 
  * Supports: OpenRouter, Gemini, Ollama (local)
  * BYOK — Bring Your Own Key
+ * 
+ * Keys are read from localStorage first (set via Settings UI),
+ * then fall back to environment variables (.env).
  */
 
 import { STORAGE_KEYS } from '../../config/constants';
 import skills from '../../data/skills.json';
 
-// AI Configuration
-export const AI_CONFIG = {
-    OPENROUTER_API_KEY: import.meta.env.VITE_OPENROUTER_API_KEY || '',
-    OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
-    GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY || '',
-    OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY || '',
-    OLLAMA_BASE_URL: import.meta.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434',
-    REQUEST_TIMEOUT_MS: Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS || 45000),
-    DEFAULT_TEXT_MODEL: 'nvidia/nemotron-nano-12b-v2-vl:free',
-    DEFAULT_IMAGE_MODEL: 'nvidia/nemotron-nano-12b-v2-vl:free',
-    DEFAULT_IMAGE_GENERATION: 'sourceful/riverflow-v2-fast'
+// localStorage key names for API keys (obfuscated slightly)
+const LS_KEYS = {
+    OPENROUTER: 'oc_k_or',
+    GEMINI: 'oc_k_gm',
+    OPENAI: 'oc_k_oa'
 };
+
+/**
+ * Get an API key — localStorage first, then .env fallback
+ */
+function getKey(lsKey, envValue) {
+    if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(lsKey);
+        if (stored) return stored;
+    }
+    return envValue || '';
+}
+
+// AI Configuration (dynamic getters for keys)
+export const AI_CONFIG = {
+    get OPENROUTER_API_KEY() { return getKey(LS_KEYS.OPENROUTER, import.meta.env.VITE_OPENROUTER_API_KEY); },
+    OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
+    get GEMINI_API_KEY() { return getKey(LS_KEYS.GEMINI, import.meta.env.VITE_GEMINI_API_KEY); },
+    get OPENAI_API_KEY() { return getKey(LS_KEYS.OPENAI, import.meta.env.VITE_OPENAI_API_KEY); },
+    get OLLAMA_BASE_URL() { return (typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEYS.OLLAMA_URL)) || import.meta.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434'; },
+    REQUEST_TIMEOUT_MS: Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS || 45000),
+    DEFAULT_TEXT_MODEL: 'google/gemini-3.1-flash-lite',
+    DEFAULT_IMAGE_MODEL: 'google/gemini-3.1-flash-lite',
+    DEFAULT_IMAGE_GENERATION: 'bytedance-seed/seedream-4.5'
+};
+
+/**
+ * Save/remove API keys from localStorage (called from Settings UI)
+ */
+export function saveApiKey(provider, key) {
+    const lsKey = LS_KEYS[provider.toUpperCase()];
+    if (!lsKey) return;
+    if (key && key.trim()) {
+        localStorage.setItem(lsKey, key.trim());
+    } else {
+        localStorage.removeItem(lsKey);
+    }
+}
+
+export function getApiKey(provider) {
+    const map = { openrouter: LS_KEYS.OPENROUTER, gemini: LS_KEYS.GEMINI, openai: LS_KEYS.OPENAI };
+    const lsKey = map[provider.toLowerCase()];
+    if (!lsKey) return '';
+    return localStorage.getItem(lsKey) || '';
+}
+
+export function clearAllApiKeys() {
+    Object.values(LS_KEYS).forEach(k => localStorage.removeItem(k));
+}
 
 // Skills system
 export const SKILLS = skills;
@@ -36,18 +81,21 @@ export function getActiveSkill() {
 
 // Model catalogs (curated defaults)
 export const TEXT_MODEL_CATALOG = [
-    { id: 'nvidia/nemotron-nano-12b-v2-vl:free', name: 'Nanometron', tier: 'all', description: 'Main model with best quality.' },
-    { id: 'stepfun/step-3.5-flash:free', name: 'Step 3.5 Flash', tier: 'all', description: 'Fast free model for daily use.' }
+    { id: 'google/gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', tier: 'all', description: 'Fast, free Google model.' },
+    { id: 'openai/gpt-5.5', name: 'GPT-5.5', tier: 'pro', description: 'Premium OpenAI model.' },
+    { id: 'nvidia/nemotron-nano-12b-v2-vl:free', name: 'Nanometron 12B', tier: 'all', description: 'Free vision-capable model.' }
 ];
 
 export const IMAGE_MODEL_CATALOG = [
-    { id: 'sourceful/riverflow-v2-fast', name: 'Riverflow V2 Fast', tier: 'all', description: 'Recommended visual model.' },
-    { id: 'bytedance-seed/seedream-4.5', name: 'Seedream 4.5', tier: 'all', description: 'Premium model for best visual results.' }
+    { id: 'x-ai/grok-imagine-image-quality', name: 'Grok Imagine (Quality)', tier: 'pro', description: 'Top-tier image generation.' },
+    { id: 'bytedance-seed/seedream-4.5', name: 'Seedream 4.5', tier: 'all', description: 'Great quality, fast generation.' },
+    { id: 'sourceful/riverflow-v2-fast', name: 'Riverflow V2 Fast', tier: 'all', description: 'Lightweight free image model.' }
 ];
 
 const TEXT_MODEL_CAPABILITIES = {
-    'nvidia/nemotron-nano-12b-v2-vl:free': { visualInput: true },
-    'stepfun/step-3.5-flash:free': { visualInput: false }
+    'google/gemini-3.1-flash-lite': { visualInput: true },
+    'openai/gpt-5.5': { visualInput: true },
+    'nvidia/nemotron-nano-12b-v2-vl:free': { visualInput: true }
 };
 
 export function getTextModelOptions() { return TEXT_MODEL_CATALOG; }
