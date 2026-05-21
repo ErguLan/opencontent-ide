@@ -88,15 +88,8 @@ export const AGENT_CONFIG = {
 
 // Asset paths
 export const ASSETS = {
-    LOGO: '/Logo.png',
-    ICONS: {
-        ASSETS: '/Assets',
-        CONSOLE: '/Console',
-        INDEX_AUS: '/IndexAUs',
-        NAV: '/nav',
-        PANEL: '/panel',
-        TOOLBAR: '/toolbarright'
-    }
+    LOGO: '/icons/logo.svg',
+    ICONS_DIR: '/icons'
 };
 
 // Animation durations (sync with CSS)

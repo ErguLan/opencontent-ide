@@ -2,15 +2,14 @@
  * Icon Component
  * OpenContent IDE
  * 
- * Wrapper for PNG icons from /public folders
- * NO EMOJIS - Only PNG icons
+ * Renders SVG icons from /public/icons/
  */
 
 import { useState } from 'react';
 import './Icon.css';
 
 /**
- * Icon component that renders PNG icons with optional animations
+ * Icon component that renders SVG icons with optional animations
  * 
  * @param {string} src - Path to the icon (relative to /public)
  * @param {string} alt - Alt text for accessibility
@@ -34,7 +33,6 @@ function Icon({
 }) {
     const [imageError, setImageError] = useState(false);
 
-    // Size mapping
     const sizeMap = {
         xs: 14,
         sm: 18,
@@ -44,25 +42,13 @@ function Icon({
     };
 
     const pixelSize = typeof size === 'number' ? size : sizeMap[size] || sizeMap.md;
-
-    // Animation class mapping
     const animationClass = animation !== 'none' ? `icon-hover-${animation}` : '';
 
-    // Handle image load error
-    const handleError = () => {
-        setImageError(true);
-    };
-
-    // If image failed to load, show fallback
     if (imageError) {
         return (
             <span
                 className={`icon icon-fallback ${className}`}
-                style={{
-                    width: pixelSize,
-                    height: pixelSize,
-                    ...style
-                }}
+                style={{ width: pixelSize, height: pixelSize, ...style }}
                 title={title}
             >
                 ?
@@ -75,13 +61,9 @@ function Icon({
             src={src}
             alt={alt}
             className={`icon ${animationClass} ${onClick ? 'icon-clickable' : ''} ${disabled ? 'icon-disabled' : ''} ${className}`}
-            style={{
-                width: pixelSize,
-                height: pixelSize,
-                ...style
-            }}
+            style={{ width: pixelSize, height: pixelSize, ...style }}
             onClick={!disabled ? onClick : undefined}
-            onError={handleError}
+            onError={() => setImageError(true)}
             title={title}
             draggable={false}
         />
@@ -89,75 +71,47 @@ function Icon({
 }
 
 /**
- * Preloaded icon paths for common icons
+ * Icon paths — clean SVG icon set
+ * All icons: white outline on transparent, 24×24 viewBox
  */
 export const ICONS = {
-    // Assets folder
-    EXECUTE: '/Assets/ExecuteButton.png',
-    EDIT: '/Assets/EditionButton.png',
-    DELETE: '/Assets/BoteDeDeletePaper.png',
-    FOLDER: '/Assets/CarpetType.png',
-    FOLDER_OPEN: '/Assets/CarpetOpenType.png',
-    FOLDER_NEW: '/Assets/CarpetNewType.png',
-    SETTINGS: '/Assets/settings.png',
-    CHECK: '/Assets/check-circle.png',
-    ADDED: '/Assets/added.png',
-    BOOK: '/Assets/book.png',
-    ROTATE: '/Assets/icon_rotate.png',
-    LOOK: '/Assets/LookAtFor.png',
-    PRO: '/Assets/Pro-P.png',
-    TROPHY: '/Assets/trophy.png',
-    NO_IMAGE: '/Assets/NoImage.png',
-    AI_Agent: '/Assets/AITlu\'k.png',
+    // Core UI
+    LOGO: '/icons/logo.svg',
+    CLOSE: '/icons/close.svg',
+    DOCK: '/icons/dock.svg',
+    CHECK: '/icons/check.svg',
+    INFO: '/icons/info.svg',
+    SEARCH: '/icons/search.svg',
+    EMPTY: '/icons/empty.svg',
 
-    // Console folder
-    CONSOLE: '/Console/console-icon.png',
-    EMPTY: '/Console/empty-icon.png',
-    SEARCH: '/Console/search-icon.png',
-    DELETE_ALT: '/Console/icon_delete.png',
+    // Actions
+    EXECUTE: '/icons/execute.svg',
+    STOP: '/icons/stop.svg',
+    RELOAD: '/icons/reload.svg',
+    ITERATE: '/icons/iterate.svg',
+    IMPORT: '/icons/import.svg',
+    EXPORT: '/icons/export.svg',
+    DOWNLOAD: '/icons/download.svg',
+    COPY: '/icons/copy.svg',
+    DELETE: '/icons/delete.svg',
+    SHARE: '/icons/share.svg',
 
-    // IndexAUs folder
-    ACTIVATE: '/IndexAUs/Activate.png',
-    DELETE_AU: '/IndexAUs/Delete.png',
-    DEPLOY: '/IndexAUs/Deploy.png',
-    DRAFT: '/IndexAUs/Draft.png',
-    DUPLICATE: '/IndexAUs/Duplicate.png',
-    EDIT_AU: '/IndexAUs/Edit.png',
-    HISTORY: '/IndexAUs/History.png',
-    RENAME: '/IndexAUs/Rename.png',
-    SHARE: '/IndexAUs/Share.png',
+    // Editor
+    EDIT_PEN: '/icons/edit_pen.svg',
+    ADDED: '/icons/add.svg',
+    NEW_PROJECT: '/icons/new_project.svg',
+    FOLDER: '/icons/folder.svg',
 
-    // Nav folder
-    ACTIVATION_NODE: '/nav/ActivationNode.png',
-    EXECUTE_NAV: '/nav/ExecuteButton.png',
-    EXECUTE_LOOP: '/nav/ExecuteButtonLoop.png',
-    SOCIAL: '/nav/Social.png',
-    ADDED_NAV: '/nav/added.png',
-    CONFIG: '/nav/icon_config.png',
-    IMPORT: '/nav/import.png',
-    SERVER: '/nav/server.png',
+    // Settings & Config
+    SETTINGS: '/icons/settings.svg',
+    CONFIG: '/icons/config.svg',
+    FOQUITO: '/icons/lightbulb.svg',
 
-    // Panel folder
-    AUTOCONNECT: '/panel/Autoconnect.png',
-    FOQUITO: '/panel/Foquito.png',
-    ADVDE: '/panel/advde.png',
-    CLOSE: '/panel/close-icon.png',
-    DOCK: '/panel/dock-icon.png',
-    CONFIG_PANEL: '/panel/icon_config.png',
-    INFO: '/panel/icon_info.png',
-
-    // Toolbar right folder
-    COPY: '/toolbarright/CopyImage.png',
-    PASTE: '/toolbarright/PasteImage.png',
-    CUT: '/toolbarright/icon_Cut.png',
-    DELETE_TOOLBAR: '/toolbarright/icon_delete.png',
-    EDIT_PEN: '/toolbarright/EditCasePen.png',
-    PROPERTIES: '/toolbarright/icon_properties.png',
-    ROTATE_TOOLBAR: '/toolbarright/icon_rotate.png',
-    LOOK_TOOLBAR: '/toolbarright/LookAtFor.png',
-
-    // Logo
-    LOGO: '/Logo.png'
+    // Features
+    PRO: '/icons/pro.svg',
+    TROPHY: '/icons/trophy.svg',
+    ACTIVATE: '/icons/activate.svg',
+    DEPLOY: '/icons/deploy.svg'
 };
 
 export default Icon;
