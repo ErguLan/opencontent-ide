@@ -38,6 +38,10 @@ import { canUseAction, getDailyUsage, incrementUsage, getPlanLimits, getModelUsa
 import { trackMetric } from '../../services/metrics';
 import { queuePublication } from '../../services/publication';
 import { applyLogoOverlay } from '../../utils/imageProcessor';
+import QuickPrompts from './components/QuickPrompts';
+import BatchMode, { BatchButton } from './components/BatchMode';
+import ContentCalendar, { CalendarToggle } from './components/ContentCalendar';
+import './components/FeatureComponents.css';
 
 // Agent states
 const AGENT_STATES = {
@@ -80,6 +84,8 @@ function Workspace() {
     const [showProModal, setShowProModal] = useState(false);
     const [displayedText, setDisplayedText] = useState('');
     const [chatInput, setChatInput] = useState('');
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [showCalendar, setShowCalendar] = useState(false);
     const [history, setHistory] = useState([]);
     const [versions, setVersions] = useState([]); // Array of { type, prompt, result, model, steps }
     const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
@@ -466,14 +472,14 @@ function Workspace() {
     const shouldAllowAutoImage = (promptText, hasAttachedImage) => {
         if (hasAttachedImage) return true;
         const text = String(promptText || '').toLowerCase();
-        return /(image|imagen|photo|foto|thumbnail|poster|cover|banner|visual|design|disena|diseña|logo|ilustracion|ilustración|render|mockup)/.test(text);
+        return /(image|imagen|photo|foto|thumbnail|poster|cover|banner|visual|design|disena|diseï¿½a|logo|ilustracion|ilustraciï¿½n|render|mockup)/.test(text);
     };
 
     const isImageEditRequest = (promptText) => {
         const text = String(promptText || '').toLowerCase();
         // Requires both an action (edit/mod) AND a visual object (image/photo/style)
         const hasAction = /(edita|editar|edit|retoca|retouch|modifica|modify|ajusta|improve|mejora|cambia|change|aplica|apply|pon|put)/.test(text);
-        const hasVisualContext = /(imagen|image|template|visual|foto|photo|diseno|diseño|estilo|style|color|iluminacion|lighting|fondo|background|efecto|effect)/.test(text);
+        const hasVisualContext = /(imagen|image|template|visual|foto|photo|diseno|diseï¿½o|estilo|style|color|iluminacion|lighting|fondo|background|efecto|effect)/.test(text);
         return hasAction && hasVisualContext;
     };
 
@@ -1754,6 +1760,11 @@ function Workspace() {
                             <Icon src={ICONS.EMPTY} size="xl" />
                             <p>{t('workspace.untitled')}</p>
                             <Button variant="primary" onClick={handleNewPrompt}>{t('workspace.newProject')}</Button>
+                            <QuickPrompts
+                                language={language}
+                                onSelect={(prompt) => setChatInput(prompt)}
+                                hasApiKeys={isAIConfigured()}
+                            />
                         </div>
                     )}
                 </div>
@@ -1872,9 +1883,30 @@ function Workspace() {
                                     : <Icon src={ICONS.RELOAD} size="xs" />}
                             </button>
                         </form>
+                        <div style={{display:'flex',gap:'6px',marginTop:'4px',justifyContent:'flex-end'}}>
+                            <BatchButton onClick={() => setShowBatchModal(true)} disabled={isGenerating || !chatInput.trim()} />
+                            <CalendarToggle onClick={() => setShowCalendar(c => !c)} hasEntries={false} />
+                        </div>
                     </div>
                 )}
             </main>
+
+            {/* Content Calendar Panel */}
+            <ContentCalendar
+                isOpen={showCalendar}
+                onClose={() => setShowCalendar(false)}
+                onLoadContent={(content) => { setChatInput(content); setShowCalendar(false); }}
+            />
+
+            {/* Batch Mode Modal */}
+            <BatchMode
+                open={showBatchModal}
+                onClose={() => setShowBatchModal(false)}
+                prompt={chatInput}
+                onConfirm={(count) => {
+                    setShowBatchModal(false);
+                }}
+            />
 
             <aside className="workspace-toolbar">
                 <div className="toolbar-group">

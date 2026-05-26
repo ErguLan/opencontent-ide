@@ -1,0 +1,410 @@
+/**
+ * Styles for QuickPrompts, BatchMode, ContentCalendar
+ * OpenContent IDE — Feature components
+ */
+
+/* ========= Quick Prompts ========= */
+.quick-prompts-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 24px 16px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.quick-prompts-container.quick-prompts-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.quick-prompts-header {
+    text-align: center;
+}
+
+.quick-prompts-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-tertiary, #666);
+    letter-spacing: 0.5px;
+}
+
+.quick-prompts-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    max-width: 500px;
+}
+
+.quick-prompts-grid-expanded {
+    max-width: 600px;
+}
+
+.quick-prompt-card {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--bg-secondary, #1e1e1e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary, #aaa);
+    transition: all 0.25s ease;
+    animation: promptFadeIn 0.4s ease both;
+    white-space: nowrap;
+}
+
+.quick-prompt-card:hover {
+    background: var(--bg-tertiary, #252525);
+    border-color: var(--color-primary, #7c3aed);
+    color: var(--text-primary, #eee);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+}
+
+.quick-prompt-emoji {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.quick-prompt-label {
+    font-weight: 500;
+}
+
+.quick-prompts-more {
+    background: none;
+    border: none;
+    color: var(--color-primary, #7c3aed);
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    padding: 4px 8px;
+}
+
+.quick-prompts-more:hover {
+    opacity: 1;
+}
+
+@keyframes promptFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+
+/* ========= Calendar Panel ========= */
+.calendar-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary, #111);
+    border-left: 1px solid var(--border-color, #333);
+    width: 320px;
+    min-width: 280px;
+    max-width: 360px;
+    height: 100%;
+    overflow-y: auto;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.calendar-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+
+.calendar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary, #eee);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.calendar-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.calendar-close:hover { opacity: 1; }
+
+/* Week nav */
+.calendar-week-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color-dim, #222);
+}
+
+.calendar-nav-btn {
+    background: var(--bg-secondary, #1e1e1e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+}
+
+.calendar-nav-btn:hover {
+    background: var(--bg-tertiary, #252525);
+    color: var(--text-primary);
+}
+
+.calendar-week-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary, #ccc);
+}
+
+/* Mini grid */
+.calendar-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color-dim, #222);
+}
+
+.calendar-day-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 2px;
+    border-radius: 8px;
+    transition: background 0.15s;
+    cursor: default;
+}
+
+.calendar-day-today {
+    background: var(--color-primary-dim, rgba(124, 58, 237, 0.12));
+    border: 1px solid var(--color-primary, #7c3aed);
+}
+
+.calendar-day-name {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-tertiary, #555);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.calendar-day-number {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #ccc);
+    margin-top: 2px;
+}
+
+.calendar-day-dots {
+    display: flex;
+    gap: 2px;
+    margin-top: 3px;
+}
+
+.calendar-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+
+/* Entries */
+.calendar-entries {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.calendar-entry-card {
+    background: var(--bg-secondary, #1e1e1e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: border-color 0.2s;
+}
+
+.calendar-entry-card:hover {
+    border-color: var(--color-primary, #7c3aed);
+}
+
+.calendar-entry-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.calendar-entry-platform {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.calendar-entry-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary, #ddd);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendar-status-select {
+    background: transparent;
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.calendar-entry-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-tertiary, #555);
+}
+
+.calendar-entry-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.calendar-entry-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+}
+
+.calendar-entry-actions button:hover { opacity: 1; }
+
+.calendar-empty {
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+    color: var(--text-tertiary, #555);
+}
+
+/* Add form */
+.calendar-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid var(--border-color, #333);
+    background: var(--bg-secondary, #1a1a1a);
+}
+
+.calendar-input,
+.calendar-textarea,
+.calendar-date-input,
+.calendar-platform-select {
+    background: var(--bg-primary, #111);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: var(--text-primary, #ddd);
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.calendar-textarea { resize: none; }
+
+.calendar-add-row {
+    display: flex;
+    gap: 8px;
+}
+
+.calendar-add-row > * { flex: 1; }
+
+.calendar-add-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.calendar-btn-cancel,
+.calendar-btn-add {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.calendar-btn-cancel {
+    background: var(--bg-tertiary, #252525);
+    color: var(--text-secondary, #aaa);
+}
+
+.calendar-btn-add {
+    background: var(--color-primary, #7c3aed);
+    color: white;
+}
+
+.calendar-btn-add:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.calendar-add-btn {
+    margin: 8px 12px 12px;
+    padding: 10px;
+    background: var(--bg-secondary, #1e1e1e);
+    border: 1px dashed var(--border-color, #444);
+    border-radius: 10px;
+    color: var(--text-secondary, #888);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.calendar-add-btn:hover {
+    border-color: var(--color-primary, #7c3aed);
+    color: var(--color-primary, #7c3aed);
+    background: var(--color-primary-dim, rgba(124, 58, 237, 0.08));
+}
+
+/* ========= Batch Mode Button ========= */
+.batch-mode-btn:hover {
+    background: var(--bg-tertiary, #333) !important;
+    border-color: var(--color-primary, #7c3aed) !important;
+    color: var(--text-primary, #eee) !important;
+}

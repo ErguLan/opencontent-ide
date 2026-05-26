@@ -18,6 +18,8 @@ import Modal from '../../components/common/Modal';
 import Starfield from '../../components/effects/Starfield';
 import { ROUTES, STORAGE_KEYS } from '../../config/constants';
 import { AI_CONFIG, getTextModelOptions, getImageModelOptions, isAIConfigured } from '../../services/ai';
+import QuickPrompts from '../workspace/components/QuickPrompts';
+import '../workspace/components/FeatureComponents.css';
 
 function Landing() {
     const navigate = useNavigate();
@@ -283,6 +285,14 @@ function Landing() {
                             <Icon src={ICONS.SETTINGS} size={18} />
                             <span>Setup API Keys to start generating</span>
                         </button>
+                    )}
+
+                    {isAIConfigured() && (
+                        <QuickPrompts
+                            language={language}
+                            onSelect={(p) => { setPrompt(p); if (inputRef.current) inputRef.current.focus(); }}
+                            hasApiKeys={true}
+                        />
                     )}
                 </div>
             </main>
