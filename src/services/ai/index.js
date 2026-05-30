@@ -101,6 +101,28 @@ const TEXT_MODEL_CAPABILITIES = {
 export function getTextModelOptions() { return TEXT_MODEL_CATALOG; }
 export function getImageModelOptions() { return IMAGE_MODEL_CATALOG; }
 
+/**
+ * Resolve active text model: custom > selected > default
+ */
+export function getActiveTextModel() {
+    const custom = localStorage.getItem(STORAGE_KEYS.CUSTOM_TEXT_MODEL);
+    if (custom && custom.trim()) return custom.trim();
+    const selected = localStorage.getItem(STORAGE_KEYS.SELECTED_TEXT_MODEL);
+    if (selected && selected.trim()) return selected.trim();
+    return AI_CONFIG.DEFAULT_TEXT_MODEL;
+}
+
+/**
+ * Resolve active image model: custom > selected > default
+ */
+export function getActiveImageModel() {
+    const custom = localStorage.getItem(STORAGE_KEYS.CUSTOM_IMAGE_MODEL);
+    if (custom && custom.trim()) return custom.trim();
+    const selected = localStorage.getItem(STORAGE_KEYS.SELECTED_IMAGE_MODEL);
+    if (selected && selected.trim()) return selected.trim();
+    return AI_CONFIG.DEFAULT_IMAGE_GENERATION;
+}
+
 export function supportsVisualInputModel(modelId = '') {
     const key = String(modelId || '').trim();
     if (!key) return false;
@@ -402,7 +424,7 @@ async function generateImageViaGemini(prompt, model, retries = 3, delay = 2000, 
 export default {
     AI_CONFIG, TEXT_MODEL_CATALOG, IMAGE_MODEL_CATALOG, SKILLS,
     isAIConfigured, isOllamaConfigured, getAvailableProviders,
-    getTextModelOptions, getImageModelOptions, supportsVisualInputModel,
+    getTextModelOptions, getImageModelOptions, getActiveTextModel, getActiveImageModel, supportsVisualInputModel,
     getSkillById, getActiveSkill,
     sendToAI, analyzeImage, generateImage
 };

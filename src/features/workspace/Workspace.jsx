@@ -20,7 +20,7 @@ import Loader from '../../components/common/Loader';
 import Tooltip from '../../components/common/Tooltip';
 import Modal from '../../components/common/Modal';
 import { ROUTES, AGENT_CONFIG, STORAGE_KEYS } from '../../config/constants';
-import { AI_CONFIG, isAIConfigured, sendToAI, generateImage, analyzeImage, getTextModelOptions, getImageModelOptions, supportsVisualInputModel } from '../../services/ai';
+import { AI_CONFIG, isAIConfigured, sendToAI, generateImage, analyzeImage, getTextModelOptions, getImageModelOptions, getActiveTextModel, getActiveImageModel, supportsVisualInputModel } from '../../services/ai';
 import {
     getLocalProjects,
     saveLocalProject,
@@ -41,6 +41,7 @@ import { applyLogoOverlay } from '../../utils/imageProcessor';
 import QuickPrompts from './components/QuickPrompts';
 import BatchMode, { BatchButton } from './components/BatchMode';
 import ContentCalendar, { CalendarToggle } from './components/ContentCalendar';
+import AgenticToggle, { getAgenticMode } from './components/AgenticToggle';
 import './components/FeatureComponents.css';
 
 // Agent states
@@ -86,6 +87,7 @@ function Workspace() {
     const [chatInput, setChatInput] = useState('');
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [agenticMode, setAgenticMode] = useState(() => getAgenticMode());
     const [history, setHistory] = useState([]);
     const [versions, setVersions] = useState([]); // Array of { type, prompt, result, model, steps }
     const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
@@ -99,10 +101,10 @@ function Workspace() {
     const [dailyUsage, setDailyUsage] = useState(() => getDailyUsage(usageUserId));
     const [showModelModal, setShowModelModal] = useState(false);
     const [selectedTextModel, setSelectedTextModel] = useState(
-        () => localStorage.getItem(STORAGE_KEYS.SELECTED_TEXT_MODEL) || AI_CONFIG.DEFAULT_TEXT_MODEL
+        () => getActiveTextModel()
     );
     const [selectedImageModel, setSelectedImageModel] = useState(
-        () => localStorage.getItem(STORAGE_KEYS.SELECTED_IMAGE_MODEL) || 'sourceful/riverflow-v2-fast'
+        () => getActiveImageModel()
     );
     const [imageProcessingMode] = useState(
         () => localStorage.getItem(STORAGE_KEYS.IMAGE_PROCESSING_MODE) || 'smart'
@@ -1883,7 +1885,8 @@ function Workspace() {
                                     : <Icon src={ICONS.RELOAD} size="xs" />}
                             </button>
                         </form>
-                        <div style={{display:'flex',gap:'6px',marginTop:'4px',justifyContent:'flex-end'}}>
+                        <div style={{display:'flex',gap:'6px',marginTop:'4px',justifyContent:'flex-end',alignItems:'center'}}>
+                            <AgenticToggle isActive={agenticMode} onToggle={setAgenticMode} isRunning={isGenerating} />
                             <BatchButton onClick={() => setShowBatchModal(true)} disabled={isGenerating || !chatInput.trim()} />
                             <CalendarToggle onClick={() => setShowCalendar(c => !c)} hasEntries={false} />
                         </div>

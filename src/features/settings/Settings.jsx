@@ -454,14 +454,19 @@ function Settings() {
 
                     {/* Custom Models Section */}
                     <section className="settings-section">
-                        <h2 className="section-title">Custom Models</h2>
+                        <h2 className="section-title">AI Models</h2>
                         <span className="setting-description" style={{ marginBottom: '12px', display: 'block' }}>
-                            Paste any model ID from OpenRouter (e.g. google/gemini-2.5-flash) or Ollama (e.g. llama3).
+                            Set the models used for text and image generation. 
+                            Paste any OpenRouter model ID (provider/model-name) or local Ollama model name.
+                            Custom model overrides the catalog selection.
                         </span>
 
                         <div className="setting-row setting-row-stacked">
                             <div className="setting-info">
-                                <span className="setting-label">Custom Text Model</span>
+                                <span className="setting-label">Text Model</span>
+                                <span className="setting-description">
+                                    Active: <strong style={{color:'var(--color-primary)'}}>{customTextModel || localStorage.getItem('oc_selected_text_model') || 'google/gemini-3.1-flash-lite'}</strong>
+                                </span>
                             </div>
                             <input
                                 type="text"
@@ -469,13 +474,43 @@ function Settings() {
                                 style={{ width: '100%' }}
                                 value={customTextModel}
                                 onChange={(e) => handleCustomTextModelChange(e.target.value)}
-                                placeholder="e.g. google/gemini-2.5-flash or llama3"
+                                placeholder="google/gemini-3.1-flash-lite"
                             />
+                            <div style={{display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap'}}>
+                                {[
+                                    'google/gemini-3.1-flash-lite',
+                                    'openai/gpt-5.5',
+                                    'nvidia/nemotron-nano-12b-v2-vl:free'
+                                ].map(m => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        className={`mode-option ${customTextModel === m ? 'active' : ''}`}
+                                        onClick={() => handleCustomTextModelChange(m)}
+                                        style={{fontSize: '11px', padding: '3px 8px'}}
+                                    >
+                                        {m.split('/').pop()}
+                                    </button>
+                                ))}
+                                {customTextModel && (
+                                    <button
+                                        type="button"
+                                        className="mode-option"
+                                        onClick={() => handleCustomTextModelChange('')}
+                                        style={{fontSize: '11px', padding: '3px 8px', color: 'var(--text-tertiary)'}}
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="setting-row setting-row-stacked" style={{ marginTop: '8px' }}>
+                        <div className="setting-row setting-row-stacked" style={{ marginTop: '12px' }}>
                             <div className="setting-info">
-                                <span className="setting-label">Custom Image Model</span>
+                                <span className="setting-label">Image Model</span>
+                                <span className="setting-description">
+                                    Active: <strong style={{color:'var(--color-primary)'}}>{customImageModel || localStorage.getItem('oc_selected_image_model') || 'bytedance-seed/seedream-4.5'}</strong>
+                                </span>
                             </div>
                             <input
                                 type="text"
@@ -483,8 +518,35 @@ function Settings() {
                                 style={{ width: '100%' }}
                                 value={customImageModel}
                                 onChange={(e) => handleCustomImageModelChange(e.target.value)}
-                                placeholder="e.g. bytedance-seed/seedream-4.5"
+                                placeholder="bytedance-seed/seedream-4.5"
                             />
+                            <div style={{display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap'}}>
+                                {[
+                                    'x-ai/grok-imagine-image-quality',
+                                    'bytedance-seed/seedream-4.5',
+                                    'sourceful/riverflow-v2-fast'
+                                ].map(m => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        className={`mode-option ${customImageModel === m ? 'active' : ''}`}
+                                        onClick={() => handleCustomImageModelChange(m)}
+                                        style={{fontSize: '11px', padding: '3px 8px'}}
+                                    >
+                                        {m.split('/').pop()}
+                                    </button>
+                                ))}
+                                {customImageModel && (
+                                    <button
+                                        type="button"
+                                        className="mode-option"
+                                        onClick={() => handleCustomImageModelChange('')}
+                                        style={{fontSize: '11px', padding: '3px 8px', color: 'var(--text-tertiary)'}}
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </section>
 
