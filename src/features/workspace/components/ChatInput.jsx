@@ -99,7 +99,7 @@ function ChatInput({
                     <Icon src={isGenerating ? ICONS.STOP : ICONS.EXECUTE} size="sm" />
                 </button>
             </form>
-            <div className="chat-input-hint">Enter · {t('workspace.send')} &nbsp; Shift+Enter · newline</div>
+            <div className="chat-input-hint">{t('ux.composerHint')}</div>
         </div>
     );
 }
