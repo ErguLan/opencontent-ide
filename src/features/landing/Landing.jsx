@@ -198,7 +198,7 @@ function Landing() {
                     {(!configured || setupNotice) && (
                         <div className="landing-provider-notice" role="status">
                             <span>{t('landing.providerRequired')}</span>
-                            <button type="button" onClick={() => navigate(ROUTES.SETTINGS)}>{t('landing.addProvider')}</button>
+                            <button type="button" onClick={() => navigate(ROUTES.SETUP)}>{t('landing.addProvider')}</button>
                         </div>
                     )}
 
