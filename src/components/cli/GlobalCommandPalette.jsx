@@ -17,6 +17,8 @@ export default function GlobalCommandPalette() {
 
     const commands = useMemo(() => [
         { id: 'open-workspace', category: 'navigation', label: t('workspace.editorShortcut'), keywords: ['editor', 'workspace'], action: () => navigate(ROUTES.WORKSPACE) },
+        { id: 'open-ai-setup', category: 'config', label: t('setup.title'), keywords: ['provider', 'model', 'api', 'ollama', 'setup', 'config'], action: () => navigate(ROUTES.SETUP) },
+        { id: 'open-library', category: 'assets', label: t('library.title'), keywords: ['library', 'assets', 'media', 'artifact', 'pdf', 'diagram', 'document', 'image'], action: () => navigate(ROUTES.LIBRARY) },
         { id: 'open-artifacts', category: 'navigation', label: t('artifactStudio.title'), shortcut: 'Ctrl/⌘ ⇧ A', keywords: ['artifact', 'pdf', 'diagram', 'document'], action: () => navigate(ROUTES.ARTIFACTS) },
         { id: 'open-gallery', category: 'navigation', label: t('gallery.title'), keywords: ['gallery', 'image', 'asset', 'media'], action: () => navigate(ROUTES.GALLERY) }
     ], [navigate, t]);
