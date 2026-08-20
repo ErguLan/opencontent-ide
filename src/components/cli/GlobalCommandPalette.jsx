@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { ROUTES } from '../../config/constants';
 import CommandPalette from './CommandPalette';
+import './GlobalCommandPalette.css';
 
 function isEditableTarget(target) {
     if (!(target instanceof HTMLElement)) return false;
@@ -51,5 +52,12 @@ export default function GlobalCommandPalette() {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [navigate]);
 
-    return <CommandPalette isOpen={open} onClose={() => setOpen(false)} commands={commands} />;
+    return (
+        <>
+            <button className="oc-global-palette-trigger" type="button" onClick={() => setOpen(true)} aria-label={t('cli.title')}>
+                <span>{t('cli.title')}</span><kbd>Ctrl/⌘ K</kbd>
+            </button>
+            <CommandPalette isOpen={open} onClose={() => setOpen(false)} commands={commands} />
+        </>
+    );
 }
