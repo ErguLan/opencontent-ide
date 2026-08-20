@@ -1,27 +1,15 @@
 /**
  * Modal Component
- * OpenContent IDE
+ * Accessible focus trap, Escape handling and focus restoration.
  */
-
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import './Modal.css';
 import { useLanguage } from '../../context/LanguageContext';
 import Icon, { ICONS } from '../icons/Icon';
 
-/**
- * Modal component with backdrop
- * 
- * @param {boolean} isOpen - Modal visibility
- * @param {function} onClose - Close handler
- * @param {string} title - Modal title
- * @param {string} size - 'sm' | 'md' | 'lg' | 'full'
- * @param {boolean} showClose - Show close button
- * @param {boolean} closeOnBackdrop - Close when clicking backdrop
- * @param {boolean} closeOnEsc - Close on Escape key
- * @param {ReactNode} children - Modal content
- * @param {ReactNode} footer - Modal footer
- */
+const FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
 function Modal({
     isOpen,
     onClose,
@@ -36,85 +24,81 @@ function Modal({
 }) {
     const { t } = useLanguage();
     const modalRef = useRef(null);
+    const previousFocusRef = useRef(null);
+    const titleId = useId();
 
-    // Close on Escape key
     useEffect(() => {
-        if (!isOpen || !closeOnEsc) return;
+        if (!isOpen) return undefined;
+        previousFocusRef.current = document.activeElement;
+        const modal = modalRef.current;
+        const first = modal?.querySelector(FOCUSABLE);
+        window.requestAnimationFrame(() => (first || modal)?.focus?.());
 
-        const handleEsc = (e) => {
-            if (e.key === 'Escape') {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape' && closeOnEsc) {
+                event.preventDefault();
                 onClose?.();
+                return;
+            }
+            if (event.key !== 'Tab' || !modal) return;
+            const focusable = [...modal.querySelectorAll(FOCUSABLE)].filter((element) => !element.hasAttribute('disabled'));
+            if (focusable.length === 0) {
+                event.preventDefault();
+                modal.focus();
+                return;
+            }
+            const firstElement = focusable[0];
+            const lastElement = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement.focus();
+            } else if (!event.shiftKey && document.activeElement === lastElement) {
+                event.preventDefault();
+                firstElement.focus();
             }
         };
 
-        document.addEventListener('keydown', handleEsc);
-        return () => document.removeEventListener('keydown', handleEsc);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            const previous = previousFocusRef.current;
+            window.requestAnimationFrame(() => previous?.focus?.());
+        };
     }, [isOpen, closeOnEsc, onClose]);
 
-    // Lock body scroll when open
     useEffect(() => {
-        if (isOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [isOpen]);
-
-    // Focus trap
-    useEffect(() => {
-        if (isOpen && modalRef.current) {
-            modalRef.current.focus();
-        }
+        if (!isOpen) return undefined;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previousOverflow; };
     }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const handleBackdropClick = (e) => {
-        if (closeOnBackdrop && e.target === e.currentTarget) {
-            onClose?.();
-        }
-    };
-
     const modal = (
-        <div
-            className="modal-backdrop animate-fadeIn"
-            onClick={handleBackdropClick}
-        >
+        <div className="modal-backdrop animate-fadeIn" onClick={(event) => {
+            if (closeOnBackdrop && event.target === event.currentTarget) onClose?.();
+        }}>
             <div
                 ref={modalRef}
                 className={`modal modal-${size} animate-fadeInScale ${className}`}
                 tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
+                aria-labelledby={title ? titleId : undefined}
             >
                 {(title || showClose) && (
                     <div className="modal-header">
-                        {title && <h2 className="modal-title">{title}</h2>}
+                        {title && <h2 id={titleId} className="modal-title">{title}</h2>}
                         {showClose && (
-                            <button
-                                className="modal-close"
-                                onClick={onClose}
-                                aria-label={t('common.closeModal')}
-                            >
-                                <Icon src={ICONS.CLOSE} size="sm" alt={t('common.close')} />
+                            <button className="modal-close" onClick={onClose} aria-label={t('common.closeModal')}>
+                                <Icon src={ICONS.CLOSE} size="sm" alt="" />
                             </button>
                         )}
                     </div>
                 )}
-
-                <div className="modal-body">
-                    {children}
-                </div>
-
-                {footer && (
-                    <div className="modal-footer">
-                        {footer}
-                    </div>
-                )}
+                <div className="modal-body">{children}</div>
+                {footer && <div className="modal-footer">{footer}</div>}
             </div>
         </div>
     );
