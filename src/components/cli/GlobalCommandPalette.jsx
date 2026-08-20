@@ -16,9 +16,9 @@ export default function GlobalCommandPalette() {
     const [open, setOpen] = useState(false);
 
     const commands = useMemo(() => [
-        { id: 'open-workspace', category: 'navigation', label: t('workspace.editorShortcut'), shortcut: 'Ctrl/⌘ W', keywords: ['editor', 'workspace'], action: () => navigate(ROUTES.WORKSPACE) },
+        { id: 'open-workspace', category: 'navigation', label: t('workspace.editorShortcut'), keywords: ['editor', 'workspace'], action: () => navigate(ROUTES.WORKSPACE) },
         { id: 'open-artifacts', category: 'navigation', label: t('artifactStudio.title'), shortcut: 'Ctrl/⌘ ⇧ A', keywords: ['artifact', 'pdf', 'diagram', 'document'], action: () => navigate(ROUTES.ARTIFACTS) },
-        { id: 'open-gallery', category: 'navigation', label: t('gallery.title'), shortcut: 'Ctrl/⌘ G', keywords: ['gallery', 'image', 'asset', 'media'], action: () => navigate(ROUTES.GALLERY) }
+        { id: 'open-gallery', category: 'navigation', label: t('gallery.title'), keywords: ['gallery', 'image', 'asset', 'media'], action: () => navigate(ROUTES.GALLERY) }
     ], [navigate, t]);
 
     useEffect(() => {
@@ -42,9 +42,6 @@ export default function GlobalCommandPalette() {
             } else if (event.shiftKey && event.key.toLowerCase() === 'a') {
                 event.preventDefault();
                 navigate(ROUTES.ARTIFACTS);
-            } else if (!event.shiftKey && event.key.toLowerCase() === 'g') {
-                event.preventDefault();
-                navigate(ROUTES.GALLERY);
             }
         };
 
