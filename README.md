@@ -5,249 +5,256 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-> Open source AI content creation studio. Self-hosted. BYOK. Ollama-compatible.
+> Open-source creative AI workspace. Self-hosted. BYOK. Local-first.
 
-**OpenContent IDE** is a local-first, open-source content creation IDE powered by AI. Generate text, images, and creative assets using your own API keys or local models via Ollama. All data stays in your browser by default.
+**OpenContent IDE** is a local-first, open-source workspace for AI-assisted content, images, diagrams and documents. Bring your own providers and model IDs, or use local inference. Browser data stays local by default.
 
----
+## Product principles
+
+- **No forced model choices** — the model registry starts empty. OpenContent never injects or auto-selects vendor model IDs.
+- **BYOK** — configure OpenRouter, OpenAI, Google, Anthropic, Ollama or a custom OpenAI-compatible provider.
+- **Local-first** — projects, media and artifacts are stored in the browser by default.
+- **Model-agnostic** — capabilities are attached to user-registered models instead of hardcoding product assumptions around one vendor.
+- **Multiple interfaces, one product** — Workspace, browser CLI, standalone CLI, API, MCP and plugins share the same concepts.
 
 ## Features
 
-- **BYOK (Bring Your Own Key)** — Use OpenRouter, OpenAI, Google, Anthropic, or Ollama. No bundled subscriptions.
-- **Ollama Support** — Run 100% locally with your own GPU. No API keys needed.
-- **Model Registry** — Built-in models plus custom model IDs with provider and capability tags.
-- **Skills System** — Switchable AI personas (Content Creator, SEO Writer, Copywriter, etc.)
-- **Local-First** — Projects and media stored in IndexedDB. Settings and keys in localStorage.
-- **Chat Memory** — Persistent conversation history per project.
-- **Streaming Responses** — Real-time SSE streaming for OpenAI and OpenRouter with incremental chunk callbacks.
-- **Plugin System** — Hook-based extensions for CLI, workspace, generation, settings, and artifact workflows.
-- **Media Panel** — Upload, tag, search, preview, and attach assets to prompts.
-- **Mini CLI** — Command palette for quick actions inside the workspace.
-- **Copy as API** — Generate curl/JS/Python snippets from any prompt.
-- **API Server Mode** — REST API with OpenAI-compatible endpoint.
-- **MCP Tool Provider** — Use as an AI tool from Claude, Gemini, etc.
-- **Dark/Light Mode** — Minimal UI with theme support.
-- **i18n** — English and Spanish out of the box.
-- **Docker Ready** — Deploy with Docker Compose.
-- **Export** — Download your projects as JSON or images.
-- **Version History** — Iterate on content with full version tracking.
+- User-managed **Model Registry** with provider and capability tags.
+- Text, vision and image generation through multiple providers.
+- **Streaming responses** for supported providers.
+- Skills/personas and project chat memory.
+- Media library and generated-image history.
+- **Artifact Studio** for diagrams, editable documents and non-destructive PDF workflows.
+- Structured diagram editor + SVG export.
+- Editable document model + PDF export.
+- Imported PDFs preserve the original binary; OpenContent annotations currently live in a separate edit layer and are not silently embedded into the source PDF.
+- AI artifact changes are proposed as structured operations before they are applied.
+- Versioned artifact operations with Undo/Redo foundations.
+- Browser CLI at `/cli` with plugins and autocomplete.
+- Standalone Node.js CLI with one-shot/script mode and interactive shell.
+- REST API and OpenAI-compatible chat endpoint.
+- MCP tool provider.
+- Hook-based plugin system.
+- Dark/light mode, EN/ES i18n, Docker and PWA support.
+- Optional Rust/WASM `oc-core` for deterministic artifact operations.
 
----
-
-## Quick Start
-
-### 1. Clone and install
+## Quick start
 
 ```bash
 git clone https://github.com/ErguLan/opencontent-ide.git
 cd opencontent-ide
 npm install
-```
-
-### 2. Configure your keys
-
-```bash
-cp .env.example .env
-# Edit .env and add at least one API key
-```
-
-### 3. Run
-
-```bash
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open `http://localhost:5173`.
 
----
+Then open **Settings** and:
 
-## Using with Ollama (100% Local)
+1. Add a provider/API key or configure a local/custom provider.
+2. Register the exact model IDs you want to use.
+3. Mark their capabilities (`text`, `vision`, `imageGeneration`, tools, etc.).
+4. Explicitly choose active text/vision/image models when needed.
 
-No API keys required. Install [Ollama](https://ollama.com), pull a model, and set the base URL:
+OpenContent does not pick a default GPT, Gemini, Seedream or any other vendor model for you.
+
+## Local inference with Ollama
+
+Ollama is supported as one provider option. Register an Ollama model in Settings and optionally configure its base URL. The runtime fallback URL is `http://localhost:11434`, but merely having that fallback does **not** make OpenContent treat AI as configured; a model must be registered by the user.
+
+Example:
 
 ```bash
 ollama pull llama3
 ```
 
-Set `VITE_OLLAMA_BASE_URL=http://localhost:11434` in your `.env` file. Select the Ollama provider in Settings and enter any model ID (e.g., `llama3`, `mistral`).
+Then register `llama3` as an Ollama text model in OpenContent.
 
----
+## Artifact Studio
 
-## API Server Mode
+Open `/artifacts` from the Workspace toolbar.
 
-Run the headless API server for integration with n8n, LangChain, Make, etc.:
+Current artifact types:
+
+- **Diagram** — structured nodes/connectors, drag editing, DSL input, auto layout and SVG export.
+- **Document** — page/block representation, manual text editing, AI generation and PDF export.
+- **PDF** — immutable uploaded original plus a separate OpenContent annotation/edit layer.
+
+Each artifact has an addressable route:
+
+```text
+/artifacts/<artifact-id>
+```
+
+For imported PDFs, the UI intentionally says **Download original** until OpenContent can embed the edit layer into a newly rendered PDF. This avoids implying that annotations have modified the source binary when they have not.
+
+See [docs/system/ARTIFACTS.md](docs/system/ARTIFACTS.md).
+
+## Browser CLI
+
+Open `/cli`.
+
+The browser CLI has command/argument suggestions, persistent local history, typo suggestions and plugin-provided commands such as:
+
+```text
+model
+project
+gallery
+artifact
+diagram
+document
+generate
+agent
+```
+
+Destructive browser-CLI operations require explicit `--force` where supported.
+
+## Standalone CLI
+
+Node.js 20+ is required.
+
+```bash
+npm run cli
+```
+
+or, after linking/installing the package:
+
+```bash
+opencontent
+# alias
+oc
+```
+
+With no arguments it opens the interactive shell. Commands can also run directly for scripts/CI:
+
+```bash
+opencontent status
+opencontent doctor
+opencontent generate "Draft a launch announcement"
+opencontent diagram "User -> API; API -> Database" -o architecture.svg
+opencontent document "Quarterly report" -o report.pdf
+opencontent pdf create "Executive summary" -o summary.pdf
+```
+
+Useful global flags:
+
+```text
+--api <url>   override OC_API_URL
+--json        structured output
+--quiet       suppress progress
+--verbose     diagnostic logging
+--help        command help
+--version     CLI version
+```
+
+Remote API calls use the Node 20 Fetch API, so both `http://` and `https://` `OC_API_URL` values are supported.
+
+`opencontent doctor` checks remote API reachability, latency, model registry state and active model selection.
+
+## API server
 
 ```bash
 npm run server:install
-OPENROUTER_API_KEY=sk-... npm run server:start
+npm run server:start
 ```
 
-**Endpoints:**
+Core endpoints include:
 
-| Method | URL | Description |
-|--------|-----|-------------|
-| POST | `/api/generate` | Generate text content |
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/api/generate` | Generate text |
 | POST | `/api/generate-image` | Generate an image |
-| GET | `/api/models` | List available models |
+| GET | `/api/models` | List models exposed by the API server |
 | GET | `/api/health` | Health check |
-| POST | `/v1/chat/completions` | OpenAI-compatible endpoint |
+| POST | `/api/artifacts/operate` | Apply structured artifact operations |
+| POST | `/api/artifacts/diagram` | Create/render a diagram |
+| POST | `/api/artifacts/document` | Create a document representation |
+| POST | `/api/artifacts/pdf/render` | Render an OpenContent document as PDF |
+| POST | `/v1/chat/completions` | OpenAI-compatible chat endpoint |
 
----
+## MCP
 
-## MCP Tool Provider
-
-Use OpenContent IDE as a tool from AI agents:
-
-```json
-{
-  "mcpServers": {
-    "opencontent": {
-      "command": "node",
-      "args": ["path/to/opencontent-ide/mcp/index.js"],
-      "env": {
-        "OPENROUTER_API_KEY": "your-key"
-      }
-    }
-  }
-}
-```
-
-**Available MCP Tools:** `generate_content`, `generate_image`, `list_gallery_assets`, `get_gallery_asset`, `clone_gallery_asset`, `save_image`, `list_skills`, `list_models`
-
-Gallery access is controlled. The browser agent can inspect IndexedDB gallery assets, while standalone MCP uses `OC_GALLERY_DIR`. Cloning creates a copy and retains the original gallery file. Local writes require `OC_ALLOW_LOCAL_WRITES=true` and an allowed destination.
-
----
-
-## Supported Providers
-
-| Provider | Text | Images | Local | Free Tier |
-|----------|------|--------|-------|-----------|
-| **OpenRouter** | Yes | Yes | No | Yes (free models) |
-| **OpenAI** | Yes | Yes | No | Paid |
-| **Google (Gemini)** | Yes | Yes | No | Yes |
-| **Anthropic (Claude)** | Yes | No | No | Paid |
-| **Ollama** | Yes | No | Yes | Yes (your GPU) |
-
----
-
-## Skills / Personas
-
-Switchable AI personas that change the agent's behavior:
-
-| Skill | Description |
-|-------|-------------|
-| Content Creator | General creative content assistant |
-| SEO Writer | Search-engine optimized content |
-| Brand Designer | Visual concepts and brand identity |
-| Social Strategist | Platform-specific social media content |
-| Copywriter | Persuasive ad copy and CTAs |
-| Meme Creator | Viral meme concepts |
-
-Add your own skills by editing `src/data/skills.json`.
-
----
-
-## Project Structure
-
-```
-├── src/                  # Frontend (React + Vite)
-│   ├── config/           # Constants, feature flags
-│   ├── context/          # React contexts (Auth, Theme, Language)
-│   ├── data/             # Skills/personas JSON
-│   ├── features/         # Pages + decomposed components & hooks
-│   │   └── workspace/
-│   │       ├── hooks/    # useWorkspaceAI, useWorkspaceMedia
-│   │       └── components/ # MediaPanel, CommandPalette, etc.
-│   ├── components/       # Reusable UI components
-│   ├── services/         # AI providers, models, media, metrics
-│   ├── styles/           # CSS variables, animations
-│   ├── i18n/             # Translations (EN/ES)
-│   └── utils/            # Helpers, image processing
-├── server/               # API Server (Express)
-│   ├── routes/           # REST endpoints
-│   └── lib/              # Shared provider logic
-├── mcp/                  # MCP Tool Provider (stdio)
-├── scripts/              # Asset generators
-├── Dockerfile            # Multi-stage Docker build
-├── docker-compose.yml    # One-click deployment
-└── .github/workflows/    # CI pipeline
-```
-
----
-
-## Generating Assets
-
-Brand assets are generated from a Python script:
+Start the main MCP provider:
 
 ```bash
-pip install Pillow
-python scripts/generate-assets.py
+npm run mcp:start
 ```
 
-This writes PNG sizes and an SVG mark to `public/brand/`.
+Artifact-focused MCP tooling is also available:
 
----
+```bash
+npm run mcp:artifacts
+```
 
-## Environment Variables
+The MCP layer is designed so agents can generate/inspect content and artifacts without making the browser UI the only integration surface.
 
-See [.env.example](.env.example) for all available options.
+## Providers
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_OPENROUTER_API_KEY` | At least one key | OpenRouter API key |
-| `VITE_OPENAI_API_KEY` | At least one key | OpenAI API key |
-| `VITE_GOOGLE_API_KEY` | At least one key | Google Gemini API key |
-| `VITE_ANTHROPIC_API_KEY` | At least one key | Anthropic API key |
-| `VITE_OLLAMA_BASE_URL` | No | Ollama URL (default: localhost:11434) |
-| `VITE_ENABLE_USAGE_LIMITS` | No | Enable freemium limits (for SaaS forks) |
+| Provider | Text | Images | Local | Notes |
+| --- | --- | --- | --- | --- |
+| OpenRouter | Yes | Model-dependent | No | BYOK |
+| OpenAI | Yes | Yes | No | BYOK |
+| Google | Yes | Model-dependent | No | BYOK |
+| Anthropic | Yes | No | No | BYOK |
+| Ollama | Yes | Model-dependent | Yes | User-managed local models |
+| Custom OpenAI-compatible | Capability-dependent | Capability-dependent | Depends | User-supplied base URL |
 
----
+Capabilities are determined by the model records the user registers; OpenContent intentionally avoids shipping a vendor model catalog as a source of implicit defaults.
+
+## Storage and privacy
+
+Browser mode uses:
+
+- IndexedDB for projects/media/artifacts.
+- localStorage for preferences, model registry and BYOK configuration.
+
+“Local-first” describes OpenContent storage. Inference is only fully local when the selected provider/infrastructure is local; using a hosted provider sends the requested inference data to that provider.
+
+## Rust / WASM core
+
+The optional deterministic core lives under:
+
+```text
+rust/oc-core
+```
+
+Run:
+
+```bash
+npm run rust:check
+npm run rust:test
+```
+
+The frontend can use the WASM build when present and fall back to JavaScript validation when it is not built.
+
+## Development
+
+```bash
+npm run dev
+npm test
+npm run lint
+npm run build
+```
+
+Main project areas:
+
+```text
+src/       React/Vite frontend
+server/    optional Express API
+cli/       standalone Node CLI
+mcp/       MCP providers
+rust/      deterministic Rust/WASM core
+docs/      architecture and system docs
+```
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-1. Fork the repo
-2. Create your feature branch (`git checkout -b feature/amazing`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing`)
-5. Open a Pull Request
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the current phase and planned work.
-
-Highlights:
-
-- [x] Core content generation (text + images)
-- [x] BYOK multi-provider support
-- [x] Model registry with custom models
-- [x] Skills/Personas system
-- [x] Local-first data storage
-- [x] i18n (EN/ES)
-- [x] Ollama integration
-- [x] API Server Mode (REST endpoints)
-- [x] OpenAI-compatible endpoint (`/v1/chat/completions`)
-- [x] Docker support
-- [x] MCP Tool Provider
-- [x] Chat with persistent memory
-- [x] "Copy as API" button
-- [x] Media Panel and asset management
-- [x] Command Palette (mini CLI)
-- [x] GitHub Actions CI
-- [x] Streaming responses (OpenAI + OpenRouter)
-- [x] Plugin system with hook extensions
-- [ ] More languages (PT, FR, DE)
-- [ ] GitHub Pages demo
-
----
+See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
----
-
-Built with React, Vite, and a lot of AI.
