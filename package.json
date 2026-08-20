@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "description": "Open source AI content creation IDE. Self-hosted, BYOK, Ollama-compatible.",
   "type": "module",
+  "bin": {
+    "opencontent": "./cli/index.js",
+    "oc": "./cli/index.js"
+  },
   "keywords": ["ai", "content-creation", "open-source", "self-hosted", "byok", "ollama"],
   "license": "MIT",
   "scripts": {
@@ -17,6 +21,7 @@
     "server:start": "cd server && node index.js",
     "mcp:start": "node mcp/index.js",
     "mcp:artifacts": "node mcp/artifacts.js",
+    "cli": "node cli/index.js",
     "cli:artifacts": "node cli/artifacts.js",
     "rust:check": "cd rust/oc-core && cargo check",
     "rust:test": "cd rust/oc-core && cargo test"
