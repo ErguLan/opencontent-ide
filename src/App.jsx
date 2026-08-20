@@ -9,9 +9,11 @@ import { AuthProvider } from './context/AuthContext';
 import GlobalCommandPalette from './components/cli/GlobalCommandPalette';
 import Landing from './features/landing/Landing';
 import Workspace from './features/workspace/Workspace';
+import AISetupPage from './features/setup/AISetupPage';
 import Settings from './features/settings/Settings';
 import Login from './features/auth/Login';
 import CliPage from './features/cli/CliPage';
+import LibraryPage from './features/library/LibraryPage';
 import GalleryPage from './features/gallery/GalleryPage';
 import ArtifactStudio from './features/artifacts/ArtifactStudio';
 import './styles/global.css';
@@ -29,9 +31,11 @@ function App() {
                                 <Route path={ROUTES.LANDING} element={<Landing />} />
                                 <Route path={ROUTES.WORKSPACE} element={<Workspace />} />
                                 <Route path={ROUTES.PROJECT} element={<Workspace />} />
+                                <Route path={ROUTES.SETUP} element={<AISetupPage />} />
                                 <Route path={ROUTES.SETTINGS} element={<Settings />} />
                                 <Route path={ROUTES.LOGIN} element={<Login />} />
                                 <Route path={ROUTES.CLI} element={<CliPage />} />
+                                <Route path={ROUTES.LIBRARY} element={<LibraryPage />} />
                                 <Route path={ROUTES.GALLERY} element={<GalleryPage />} />
                                 <Route path={ROUTES.ARTIFACTS} element={<ArtifactStudio />} />
                                 <Route path={`${ROUTES.ARTIFACTS}/:artifactId`} element={<ArtifactStudio />} />
