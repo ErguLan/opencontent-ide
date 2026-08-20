@@ -43,7 +43,7 @@ function ModelSelector({ textModel, visionModel, imageModel, onTextChange, onVis
 
     const handleManageModels = () => {
         onCancel?.();
-        navigate(ROUTES.SETTINGS);
+        navigate(ROUTES.SETUP);
     };
 
     const renderSelect = (id, label, value, setValue, options) => (
