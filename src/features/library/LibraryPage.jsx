@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../config/constants';
 import { useLanguage } from '../../context/LanguageContext';
+import Modal from '../../components/common/Modal';
 import { getAllMedia } from '../../services/mediaService';
 import { listArtifacts } from '../../services/artifacts/artifactEngine';
 import './LibraryPage.css';
@@ -96,13 +97,13 @@ export default function LibraryPage() {
                     <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('ux.search')} aria-label={t('ux.search')} />
                     <div className="oc-library-filters" role="group" aria-label={t('library.filters')}>
                         {['all', 'media', 'artifact', 'image', 'diagram', 'document', 'pdf'].map((value) => (
-                            <button type="button" key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{t(`library.filter.${value}`)}</button>
+                            <button type="button" key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)} aria-pressed={filter === value}>{t(`library.filter.${value}`)}</button>
                         ))}
                     </div>
                 </section>
 
-                {loading && <div className="oc-library-state">{t('library.loading')}</div>}
-                {!loading && error && <div className="oc-library-state error"><p>{error}</p><button type="button" onClick={load}>{t('library.retry')}</button></div>}
+                {loading && <div className="oc-library-state" role="status" aria-live="polite">{t('library.loading')}</div>}
+                {!loading && error && <div className="oc-library-state error" role="alert"><p>{error}</p><button type="button" onClick={load}>{t('library.retry')}</button></div>}
                 {!loading && !error && items.length === 0 && (
                     <div className="oc-library-state">
                         <h2>{query || filter !== 'all' ? t('library.noResults') : t('library.emptyTitle')}</h2>
@@ -112,7 +113,7 @@ export default function LibraryPage() {
                 )}
 
                 {!loading && !error && items.length > 0 && (
-                    <section className="oc-library-grid">
+                    <section className="oc-library-grid" aria-label={t('library.title')}>
                         {items.map((item) => (
                             <button type="button" className="oc-library-card" key={`${item.libraryKind}-${item.id}`} onClick={() => openItem(item)}>
                                 <div className={`oc-library-preview ${item.libraryKind} ${item.libraryType}`}>
@@ -130,10 +131,16 @@ export default function LibraryPage() {
                 )}
             </main>
 
-            {selectedMedia && (
-                <div className="oc-library-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedMedia(null); }}>
-                    <div className="oc-library-modal" role="dialog" aria-modal="true" aria-label={selectedMedia.name || t('library.media')}>
-                        <div className="oc-library-modal-header"><div><strong>{selectedMedia.name || t('library.untitled')}</strong><span>{selectedMedia.role || selectedMedia.kind || selectedMedia.type}</span></div><button type="button" onClick={() => setSelectedMedia(null)}>×</button></div>
+            <Modal
+                isOpen={Boolean(selectedMedia)}
+                onClose={() => setSelectedMedia(null)}
+                title={selectedMedia?.name || t('library.media')}
+                size="lg"
+                className="oc-library-modal-shell"
+            >
+                {selectedMedia && (
+                    <div className="oc-library-modal">
+                        <span className="oc-library-modal-kind">{selectedMedia.role || selectedMedia.kind || selectedMedia.type}</span>
                         {selectedMedia.data?.startsWith('data:image') && <img src={selectedMedia.data} alt={selectedMedia.name || ''} />}
                         <dl>
                             {selectedMedia.model && <><dt>{t('library.model')}</dt><dd>{selectedMedia.model}</dd></>}
@@ -142,8 +149,8 @@ export default function LibraryPage() {
                         </dl>
                         <div className="oc-library-modal-actions"><button type="button" onClick={() => navigate(ROUTES.GALLERY)}>{t('library.openGallery')}</button></div>
                     </div>
-                </div>
-            )}
+                )}
+            </Modal>
         </div>
     );
 }
