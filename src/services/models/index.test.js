@@ -10,13 +10,22 @@ import {
 
 describe('Model Registry', () => {
     beforeEach(() => {
-        // Clean localStorage before each test
         localStorage.clear();
     });
 
     it('returns empty array when no models are stored', () => {
         const models = getStoredModels();
         expect(models.length).toBe(0);
+    });
+
+    it('does not synthesize provider or capabilities for an unknown model id', () => {
+        const resolved = resolveModel('vendor/model-that-was-never-registered');
+        expect(resolved.id).toBe('vendor/model-that-was-never-registered');
+        expect(resolved.provider).toBeNull();
+        expect(resolved.capabilities.text).toBe(false);
+        expect(resolved.capabilities.vision).toBe(false);
+        expect(resolved.capabilities.imageGeneration).toBe(false);
+        expect(getStoredModels()).toHaveLength(0);
     });
 
     it('adds and removes a custom model', () => {
