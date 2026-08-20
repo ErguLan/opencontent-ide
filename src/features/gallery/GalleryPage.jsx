@@ -97,11 +97,12 @@ export default function GalleryPage() {
     return (
         <div className="gallery-page">
             <header className="gallery-header">
-                <button className="icon-button" onClick={() => navigate(ROUTES.WORKSPACE)} aria-label={t('common.back')}>
+                <button className="icon-button" onClick={() => navigate(ROUTES.LIBRARY)} aria-label={t('library.title')}>
                     <Icon src={ICONS.CLOSE} size="sm" alt="" />
                 </button>
                 <h1>{t('gallery.title')}</h1>
                 <span className="gallery-count">{assets.length} {t('gallery.assets')}</span>
+                <button type="button" className="gallery-library-link" onClick={() => navigate(ROUTES.LIBRARY)}>{t('library.title')}</button>
             </header>
 
             {loading && (
@@ -115,6 +116,10 @@ export default function GalleryPage() {
                 <div className="gallery-empty">
                     <Icon src={ICONS.EMPTY} size="xl" alt="" />
                     <p>{t('gallery.empty')}</p>
+                    <div className="gallery-empty-actions">
+                        <button type="button" onClick={() => navigate(ROUTES.WORKSPACE)}>{t('library.openWorkspace')}</button>
+                        <button type="button" onClick={() => navigate(ROUTES.LIBRARY)}>{t('library.title')}</button>
+                    </div>
                 </div>
             )}
 
