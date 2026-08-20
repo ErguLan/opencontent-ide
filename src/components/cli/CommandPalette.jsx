@@ -105,7 +105,7 @@ function CommandPalette({ isOpen, onClose, commands = [] }) {
                         previousCategory = command.category;
                         return (
                             <div key={command.id} className="oc-command-palette-entry">
-                                {showCategory && <div className="oc-command-palette-category">{command.category}</div>}
+                                {showCategory && <div className="oc-command-palette-category">{t(`cliUx.category.${command.category}`)}</div>}
                                 <button
                                     type="button"
                                     role="option"
