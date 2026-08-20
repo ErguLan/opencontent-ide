@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider } from './context/AuthContext';
+import GlobalCommandPalette from './components/cli/GlobalCommandPalette';
 import Landing from './features/landing/Landing';
 import Workspace from './features/workspace/Workspace';
 import Settings from './features/settings/Settings';
@@ -22,6 +23,7 @@ function App() {
             <ThemeProvider>
                 <LanguageProvider>
                     <AuthProvider>
+                        <GlobalCommandPalette />
                         <div className="app-container">
                             <Routes>
                                 <Route path={ROUTES.LANDING} element={<Landing />} />
