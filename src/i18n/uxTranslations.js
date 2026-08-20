@@ -6,6 +6,8 @@ export default {
       chooseModel: 'Choose model'
     },
     workspace: {
+      apiKeyRequiredTitle: 'AI setup required',
+      apiKeyRequiredMessage: 'Add a provider, register a text-capable model, and choose it when you want to generate.',
       apiKeyRequiredOrOllama: 'Or add another provider in Settings.',
       toolbar: { actions: 'Workspace actions' },
       model: {
@@ -41,6 +43,8 @@ export default {
       chooseModel: 'Elegir modelo'
     },
     workspace: {
+      apiKeyRequiredTitle: 'Falta configurar la IA',
+      apiKeyRequiredMessage: 'Agrega un proveedor, registra un modelo con capacidad de texto y elígelo cuando quieras generar.',
       apiKeyRequiredOrOllama: 'O agrega otro proveedor en Configuración.',
       toolbar: { actions: 'Acciones del espacio de trabajo' },
       model: {
