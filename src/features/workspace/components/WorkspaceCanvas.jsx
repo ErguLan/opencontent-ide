@@ -4,7 +4,6 @@
  */
 import Icon, { ICONS } from '../../../components/icons/Icon';
 import Loader from '../../../components/common/Loader';
-import Button from '../../../components/common/Button';
 
 const AGENT_STATES = {
     IDLE: 'IDLE',
@@ -15,10 +14,10 @@ const AGENT_STATES = {
 };
 
 function WorkspaceCanvas({
-    agentState, errorMessage, isIterating, isGenerating,
+    agentState, errorMessage, isIterating,
     agentSteps, versions, currentVersionIndex, currentVersion,
     displayedText, showLastPromptInResult,
-    onPrevVersion, onNextVersion, onDownloadImage, onCopyText, onExport,
+    onPrevVersion, onNextVersion, onDownloadImage, onCopyText,
     isAIConfigured, t
 }) {
     const isWorking = agentState === AGENT_STATES.ANALYZING || agentState === AGENT_STATES.GENERATING;
@@ -28,10 +27,9 @@ function WorkspaceCanvas({
         return (
             <div className="workspace-canvas">
                 <div className="canvas-error animate-fadeInUp">
-                    <h3>API Key Required</h3>
-                    <p>Add your OpenRouter API key to <code>.env</code>:</p>
-                    <pre className="code-block">VITE_OPENROUTER_API_KEY=your_key</pre>
-                    <p>Or use Ollama for 100% local AI.</p>
+                    <h3>{t('workspace.apiKeyRequiredTitle')}</h3>
+                    <p>{t('workspace.apiKeyRequiredMessage')}</p>
+                    <p>{t('workspace.apiKeyRequiredOrOllama')}</p>
                 </div>
             </div>
         );
@@ -88,7 +86,7 @@ function WorkspaceCanvas({
                     <div className="result-card">
                         <div className="result-header">
                             <span className="result-type">
-                                {currentVersion.type === 'image' ? '🎨' : '📝'}
+                                {currentVersion.type === 'image' ? t('workspace.result.image') : t('workspace.result.text')}
                             </span>
                             <span className="result-model">{currentVersion.model}</span>
                         </div>

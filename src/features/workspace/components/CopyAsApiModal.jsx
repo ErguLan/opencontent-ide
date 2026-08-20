@@ -3,6 +3,7 @@
  * OpenContent IDE
  */
 import { useState } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import Modal from '../../../components/common/Modal';
 import {
     generateCurlCommand,
@@ -12,20 +13,21 @@ import {
     copyToClipboard
 } from '../../../services/copyAsApi';
 
-const TABS = [
-    { id: 'curl', label: 'curl' },
-    { id: 'fetch', label: 'JavaScript' },
-    { id: 'python', label: 'Python' },
-    { id: 'local', label: 'Local Server' }
-];
-
-function CopyAsApiModal({ open, onClose, prompt, model }) {
+function CopyAsApiModal({ isOpen, onClose, prompt, model }) {
+    const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState('curl');
     const [copied, setCopied] = useState(false);
 
-    if (!open) return null;
+    if (!isOpen) return null;
 
     const params = { prompt: prompt || '', model };
+
+    const tabs = [
+        { id: 'curl', label: t('workspace.copyAsApi.curl') },
+        { id: 'fetch', label: t('workspace.copyAsApi.javascript') },
+        { id: 'python', label: t('workspace.copyAsApi.python') },
+        { id: 'local', label: t('workspace.copyAsApi.localServer') }
+    ];
 
     const snippets = {
         curl: generateCurlCommand(params),
@@ -41,9 +43,9 @@ function CopyAsApiModal({ open, onClose, prompt, model }) {
     };
 
     return (
-        <Modal open={open} onClose={onClose} title="Copy as API">
+        <Modal open={isOpen} onClose={onClose} title={t('workspace.copyAsApi.title')}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                {TABS.map(tab => (
+                {tabs.map(tab => (
                     <button
                         key={tab.id}
                         type="button"
@@ -95,7 +97,7 @@ function CopyAsApiModal({ open, onClose, prompt, model }) {
                     width: '100%'
                 }}
             >
-                {copied ? 'Copied!' : 'Copy to Clipboard'}
+                {copied ? t('workspace.copyAsApi.copied') : t('workspace.copyAsApi.copy')}
             </button>
         </Modal>
     );

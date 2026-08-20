@@ -7,7 +7,8 @@
  * Data persists in localStorage.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import Icon, { ICONS } from '../../../components/icons/Icon';
 
 const STORAGE_KEY = 'oc_content_calendar';
@@ -34,6 +35,7 @@ function getToday() {
 }
 
 function ContentCalendar({ isOpen, onClose, onLoadContent }) {
+    const { t } = useLanguage();
     const [entries, setEntries] = useState(getStoredEntries);
     const [showAdd, setShowAdd] = useState(false);
     const [newEntry, setNewEntry] = useState({
@@ -46,19 +48,19 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
     const [selectedWeek, setSelectedWeek] = useState(0);
 
     const platforms = [
-        { id: 'instagram', emoji: '📱', label: 'Instagram' },
-        { id: 'twitter', emoji: '🐦', label: 'Twitter/X' },
-        { id: 'linkedin', emoji: '💼', label: 'LinkedIn' },
-        { id: 'email', emoji: '📧', label: 'Email' },
-        { id: 'blog', emoji: '📝', label: 'Blog' },
-        { id: 'youtube', emoji: '🎬', label: 'YouTube' },
-        { id: 'other', emoji: '📌', label: 'Other' }
+        { id: 'instagram', label: 'Instagram' },
+        { id: 'twitter', label: 'Twitter/X' },
+        { id: 'linkedin', label: 'LinkedIn' },
+        { id: 'email', label: 'Email' },
+        { id: 'blog', label: 'Blog' },
+        { id: 'youtube', label: 'YouTube' },
+        { id: 'other', label: t('calendar.other') }
     ];
 
     const statusOptions = [
-        { id: 'draft', label: 'Draft', color: '#666' },
-        { id: 'ready', label: 'Ready', color: '#4ade80' },
-        { id: 'published', label: 'Published', color: '#7c3aed' }
+        { id: 'draft', label: t('calendar.statusDraft'), color: '#666' },
+        { id: 'ready', label: t('calendar.statusReady'), color: '#4ade80' },
+        { id: 'published', label: t('calendar.statusPublished'), color: '#7c3aed' }
     ];
 
     const handleAdd = () => {
@@ -113,19 +115,16 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
     return (
         <div className="calendar-panel">
             <div className="calendar-panel-header">
-                <h3 className="calendar-title">
-                    <span>📅</span> Content Calendar
-                </h3>
+                <h3 className="calendar-title">{t('calendar.title')}</h3>
                 <button className="calendar-close" onClick={onClose}>
                     <Icon src={ICONS.CLOSE} size="xs" />
                 </button>
             </div>
 
-            {/* Week Navigation */}
             <div className="calendar-week-nav">
                 <button onClick={() => setSelectedWeek(w => w - 1)} className="calendar-nav-btn">←</button>
                 <span className="calendar-week-label">
-                    {selectedWeek === 0 ? 'This week' : selectedWeek > 0 ? `+${selectedWeek} week${selectedWeek > 1 ? 's' : ''}` : `${selectedWeek} week${Math.abs(selectedWeek) > 1 ? 's' : ''}`}
+                    {selectedWeek === 0 ? t('calendar.thisWeek') : selectedWeek > 0 ? `+${selectedWeek} ${t('calendar.week')}${selectedWeek > 1 ? 's' : ''}` : `${selectedWeek} ${t('calendar.week')}${Math.abs(selectedWeek) > 1 ? 's' : ''}`}
                 </span>
                 <button onClick={() => setSelectedWeek(w => w + 1)} className="calendar-nav-btn">→</button>
             </div>
@@ -159,7 +158,6 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
                 })}
             </div>
 
-            {/* Entries for this week */}
             <div className="calendar-entries">
                 {weekDays.map(dateStr => {
                     const dayEntries = entries.filter(e => e.date === dateStr);
@@ -168,7 +166,7 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
                         <div key={entry.id} className="calendar-entry-card">
                             <div className="calendar-entry-top">
                                 <span className="calendar-entry-platform">
-                                    {platforms.find(p => p.id === entry.platform)?.emoji || '📌'}
+                                    {platforms.find(p => p.id === entry.platform)?.label || t('calendar.other')}
                                 </span>
                                 <span className="calendar-entry-title">{entry.title}</span>
                                 <select
@@ -186,11 +184,11 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
                                 <span>{formatDate(entry.date)}</span>
                                 <div className="calendar-entry-actions">
                                     {entry.content && (
-                                        <button onClick={() => handleLoad(entry)} title="Load into editor">
+                                        <button onClick={() => handleLoad(entry)} title={t('calendar.loadIntoEditor')}>
                                             <Icon src={ICONS.IMPORT} size="xs" />
                                         </button>
                                     )}
-                                    <button onClick={() => handleDelete(entry.id)} title="Delete">
+                                    <button onClick={() => handleDelete(entry.id)} title={t('common.delete')}>
                                         <Icon src={ICONS.DELETE} size="xs" />
                                     </button>
                                 </div>
@@ -200,26 +198,23 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
                 })}
 
                 {entries.filter(e => weekDays.includes(e.date)).length === 0 && (
-                    <div className="calendar-empty">
-                        No content scheduled this week
-                    </div>
+                    <div className="calendar-empty">{t('calendar.noContent')}</div>
                 )}
             </div>
 
-            {/* Add Entry Form */}
             {showAdd ? (
                 <div className="calendar-add-form">
                     <input
                         type="text"
                         className="calendar-input"
-                        placeholder="Content title..."
+                        placeholder={t('calendar.titlePlaceholder')}
                         value={newEntry.title}
                         onChange={e => setNewEntry({...newEntry, title: e.target.value})}
                         autoFocus
                     />
                     <textarea
                         className="calendar-textarea"
-                        placeholder="Content body (optional)..."
+                        placeholder={t('calendar.bodyPlaceholder')}
                         value={newEntry.content}
                         onChange={e => setNewEntry({...newEntry, content: e.target.value})}
                         rows={2}
@@ -237,18 +232,18 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
                             onChange={e => setNewEntry({...newEntry, platform: e.target.value})}
                         >
                             {platforms.map(p => (
-                                <option key={p.id} value={p.id}>{p.emoji} {p.label}</option>
+                                <option key={p.id} value={p.id}>{p.label}</option>
                             ))}
                         </select>
                     </div>
                     <div className="calendar-add-actions">
-                        <button className="calendar-btn-cancel" onClick={() => setShowAdd(false)}>Cancel</button>
-                        <button className="calendar-btn-add" onClick={handleAdd} disabled={!newEntry.title.trim()}>Add</button>
+                        <button className="calendar-btn-cancel" onClick={() => setShowAdd(false)}>{t('common.cancel')}</button>
+                        <button className="calendar-btn-add" onClick={handleAdd} disabled={!newEntry.title.trim()}>{t('common.add')}</button>
                     </div>
                 </div>
             ) : (
                 <button className="calendar-add-btn" onClick={() => setShowAdd(true)}>
-                    + Schedule Content
+                    + {t('calendar.scheduleContent')}
                 </button>
             )}
         </div>
@@ -259,12 +254,13 @@ function ContentCalendar({ isOpen, onClose, onLoadContent }) {
  * CalendarToggle — Button to toggle calendar panel
  */
 export function CalendarToggle({ onClick, hasEntries }) {
+    const { t } = useLanguage();
     return (
         <button
             type="button"
             className="calendar-toggle-btn"
             onClick={onClick}
-            title="Content Calendar"
+            title={t('calendar.title')}
             style={{
                 background: hasEntries ? 'var(--color-primary-dim, rgba(124,58,237,0.15))' : 'var(--bg-secondary, #2a2a2a)',
                 border: '1px solid var(--border-color, #333)',
@@ -280,7 +276,7 @@ export function CalendarToggle({ onClick, hasEntries }) {
                 transition: 'all 0.2s ease'
             }}
         >
-            📅 Calendar
+            {t('calendar.title')}
         </button>
     );
 }

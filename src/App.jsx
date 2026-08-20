@@ -16,6 +16,8 @@ import Landing from './features/landing/Landing';
 import Workspace from './features/workspace/Workspace';
 import Settings from './features/settings/Settings';
 import Login from './features/auth/Login';
+import CliPage from './features/cli/CliPage';
+import GalleryPage from './features/gallery/GalleryPage';
 
 // Styles
 import './styles/global.css';
@@ -43,6 +45,12 @@ function App() {
 
                                 {/* Login */}
                                 <Route path={ROUTES.LOGIN} element={<Login />} />
+
+                                {/* CLI */}
+                                <Route path={ROUTES.CLI} element={<CliPage />} />
+
+                                {/* Gallery */}
+                                <Route path={ROUTES.GALLERY} element={<GalleryPage />} />
 
                                 {/* Fallback - redirect to landing */}
                                 <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />

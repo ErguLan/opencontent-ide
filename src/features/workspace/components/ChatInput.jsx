@@ -11,7 +11,7 @@ function ChatInput({
     attachedMedia, onRemoveAttach,
     activeAssetIds, mediaAssets,
     chatFileInputRef, onAttachFile,
-    selectedTextModel, selectedImageModel,
+    selectedTextModel,
     onShowModelModal, isPro, onShowProModal,
     getTextModelLabel, getAssetRoleLabel,
     onAbort, t
@@ -70,7 +70,9 @@ function ChatInput({
             {attachedMedia && (
                 <div className="chat-attachment-preview animate-fadeInUp">
                     <img src={attachedMedia.dataUrl} alt={attachedMedia.name} />
-                    <button className="remove-attach" onClick={onRemoveAttach}>✕</button>
+                    <button className="remove-attach" onClick={onRemoveAttach} aria-label={t('common.remove')}>
+                        <Icon src={ICONS.CLOSE} size="xs" />
+                    </button>
                 </div>
             )}
 
@@ -99,7 +101,7 @@ function ChatInput({
                     type="button"
                     className="chat-import-btn"
                     onClick={() => chatFileInputRef.current?.click()}
-                    aria-label="Attach image"
+                    aria-label={t('workspace.media.attach')}
                 >
                     <Icon src={ICONS.IMPORT} size="sm" />
                 </button>

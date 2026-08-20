@@ -5,6 +5,8 @@
  * Manages i18n language state
  */
 
+/* eslint-disable react-refresh/only-export-components */
+
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { STORAGE_KEYS, LANGUAGES } from '../config/constants';
 import { t, getSection, getLanguages, getBrowserLanguage } from '../i18n';
@@ -22,8 +24,8 @@ export function LanguageProvider({ children }) {
         document.documentElement.setAttribute('lang', language);
     }, [language]);
 
-    const translate = useCallback((key) => {
-        return t(key, language);
+    const translate = useCallback((key, vars = {}) => {
+        return t(key, vars, language);
     }, [language]);
 
     const getSectionTranslations = useCallback((section) => {

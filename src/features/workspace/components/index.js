@@ -3,3 +3,4 @@ export { default as WorkspaceCanvas } from './WorkspaceCanvas';
 export { default as ChatInput } from './ChatInput';
 export { default as WorkspaceToolbar } from './WorkspaceToolbar';
 export { default as CopyAsApiModal } from './CopyAsApiModal';
+export { default as ArtifactPanel } from './ArtifactPanel';

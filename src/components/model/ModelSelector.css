@@ -1,0 +1,55 @@
+.oc-model-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.oc-model-selector-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.oc-model-selector-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.oc-model-selector-select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+}
+
+.oc-model-selector-select:focus {
+    border-color: var(--color-primary);
+}
+
+.oc-model-selector-meta {
+    min-height: 18px;
+}
+
+.oc-model-selector-id {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    word-break: break-all;
+}
+
+.oc-model-selector-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.oc-model-selector-save-group {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}

@@ -7,7 +7,10 @@
  * Cannot be deactivated while an agentic task is running.
  */
 
+/* eslint-disable react-refresh/only-export-components */
+
 import { useState } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 
 const AGENTIC_STORAGE_KEY = 'oc_agentic_mode';
 
@@ -16,6 +19,7 @@ export function getAgenticMode() {
 }
 
 function AgenticToggle({ isActive, onToggle, isRunning = false }) {
+    const { t } = useLanguage();
     const [showWarning, setShowWarning] = useState(false);
     const [showCantDisable, setShowCantDisable] = useState(false);
 
@@ -44,7 +48,7 @@ function AgenticToggle({ isActive, onToggle, isRunning = false }) {
                 type="button"
                 className={`agentic-toggle ${isActive ? 'agentic-active' : ''}`}
                 onClick={handleClick}
-                title={isActive ? 'Agentic Mode: ON' : 'Agentic Mode: OFF'}
+                title={isActive ? t('workspace.agentic.toggleOn') : t('workspace.agentic.toggleOff')}
             >
                 <svg className="agentic-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     {isActive ? (
@@ -63,7 +67,7 @@ function AgenticToggle({ isActive, onToggle, isRunning = false }) {
                         </>
                     )}
                 </svg>
-                <span className="agentic-label">{isActive ? 'Agentic' : 'Chat'}</span>
+                <span className="agentic-label">{isActive ? t('workspace.agentic.on') : t('workspace.agentic.off')}</span>
                 {isActive && <span className="agentic-pulse" />}
             </button>
 
@@ -77,31 +81,30 @@ function AgenticToggle({ isActive, onToggle, isRunning = false }) {
                                 <path d="M10 13h4v2a2 2 0 0 1-4 0v-2z"/>
                                 <path d="M12 18v4"/>
                             </svg>
-                            <h3>Enable Agentic Mode</h3>
+                            <h3>{t('workspace.agentic.activateTitle')}</h3>
                         </div>
 
                         <div className="agentic-modal-body">
                             <p className="agentic-modal-desc">
-                                Agentic Mode lets the AI <strong>iterate autonomously</strong> — analyzing results, 
-                                refining outputs, and chaining operations until the task is complete.
+                                {t('workspace.agentic.description')}
                             </p>
 
                             <div className="agentic-features">
                                 <div className="agentic-feature">
                                     <span className="agentic-feature-icon">1</span>
-                                    <span>Auto-iterate until satisfied</span>
+                                    <span>{t('workspace.agentic.feature1')}</span>
                                 </div>
                                 <div className="agentic-feature">
                                     <span className="agentic-feature-icon">2</span>
-                                    <span>Analyze generated images</span>
+                                    <span>{t('workspace.agentic.feature2')}</span>
                                 </div>
                                 <div className="agentic-feature">
                                     <span className="agentic-feature-icon">3</span>
-                                    <span>Chain text, image, refine</span>
+                                    <span>{t('workspace.agentic.feature3')}</span>
                                 </div>
                                 <div className="agentic-feature">
                                     <span className="agentic-feature-icon">4</span>
-                                    <span>Multi-step content pipelines</span>
+                                    <span>{t('workspace.agentic.feature4')}</span>
                                 </div>
                             </div>
 
@@ -112,18 +115,17 @@ function AgenticToggle({ isActive, onToggle, isRunning = false }) {
                                     <line x1="12" y1="17" x2="12.01" y2="17"/>
                                 </svg>
                                 <span>
-                                    <strong>Token Warning:</strong> Agentic mode uses 3-10x more tokens per task 
-                                    depending on complexity and model. Monitor your API usage.
+                                    <strong>{t('workspace.agentic.tokenWarning')}:</strong> {t('workspace.agentic.tokenWarningText')}
                                 </span>
                             </div>
                         </div>
 
                         <div className="agentic-modal-actions">
                             <button className="agentic-btn-cancel" onClick={() => setShowWarning(false)}>
-                                Stay in Chat Mode
+                                {t('workspace.agentic.cancel')}
                             </button>
                             <button className="agentic-btn-activate" onClick={handleConfirmActivate}>
-                                Activate Agentic Mode
+                                {t('workspace.agentic.activate')}
                             </button>
                         </div>
                     </div>
@@ -139,17 +141,16 @@ function AgenticToggle({ isActive, onToggle, isRunning = false }) {
                                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                             </svg>
-                            <h3>Can't Disable</h3>
+                            <h3>{t('workspace.agentic.cantDisableTitle')}</h3>
                         </div>
                         <div className="agentic-modal-body">
                             <p className="agentic-modal-desc">
-                                Agentic Mode can't be turned off while a task is running. 
-                                Wait for the current operation to complete, or stop it first.
+                                {t('workspace.agentic.cantDisableMessage')}
                             </p>
                         </div>
                         <div className="agentic-modal-actions">
                             <button className="agentic-btn-activate" onClick={() => setShowCantDisable(false)}>
-                                Got it
+                                {t('workspace.agentic.gotIt')}
                             </button>
                         </div>
                     </div>

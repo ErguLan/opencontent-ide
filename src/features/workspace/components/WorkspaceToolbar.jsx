@@ -9,12 +9,12 @@ function WorkspaceToolbar({
     onNewPrompt, onIterate, onExport, onDownloadImage,
     onCopyText, onDeleteProject,
     versions, currentVersion, currentProjectId,
-    isWorking, isGenerating, t
+    isWorking, t
 }) {
     return (
         <aside className="workspace-toolbar">
             <div className="toolbar-group">
-                <Tooltip text={t('workspace.toolbar.newPrompt') || 'New prompt'}>
+                <Tooltip text={t('workspace.toolbar.newPrompt')}>
                     <button
                         className="toolbar-button"
                         onClick={onNewPrompt}
@@ -24,7 +24,7 @@ function WorkspaceToolbar({
                     </button>
                 </Tooltip>
 
-                <Tooltip text={t('workspace.toolbar.iterate') || 'Iterate'}>
+                <Tooltip text={t('workspace.toolbar.iterate')}>
                     <button
                         className="toolbar-button"
                         onClick={onIterate}
@@ -35,7 +35,7 @@ function WorkspaceToolbar({
                     </button>
                 </Tooltip>
 
-                <Tooltip text={t('workspace.toolbar.export') || 'Export'}>
+                <Tooltip text={t('workspace.toolbar.export')}>
                     <button
                         className="toolbar-button"
                         onClick={onExport}
@@ -46,7 +46,7 @@ function WorkspaceToolbar({
                     </button>
                 </Tooltip>
 
-                <Tooltip text={t('workspace.toolbar.download') || 'Download'}>
+                <Tooltip text={t('workspace.toolbar.download')}>
                     <button
                         className="toolbar-button"
                         disabled={versions.length === 0}
@@ -57,7 +57,7 @@ function WorkspaceToolbar({
                     </button>
                 </Tooltip>
 
-                <Tooltip text={t('workspace.toolbar.copy') || 'Copy'}>
+                <Tooltip text={t('workspace.toolbar.copy')}>
                     <button
                         className="toolbar-button toolbar-button-accent"
                         disabled={!currentVersion?.result}
@@ -72,7 +72,7 @@ function WorkspaceToolbar({
             <div className="toolbar-divider" />
 
             <div className="toolbar-group">
-                <Tooltip text={t('workspace.toolbar.delete') || 'Delete'}>
+                <Tooltip text={t('workspace.toolbar.delete')}>
                     <button
                         className="toolbar-button toolbar-button-danger"
                         disabled={!currentProjectId}

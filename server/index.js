@@ -20,12 +20,28 @@ import { generateRoute } from './routes/generate.js';
 import { imagesRoute } from './routes/images.js';
 import { openaiRoute } from './routes/openai.js';
 import { modelsRoute } from './routes/models.js';
+import usageRoute from './routes/usage.js';
+import storageRoute from './routes/storage.js';
+import sessionsRoute from './routes/sessions.js';
+import clientConfigRoute from './routes/clientConfig.js';
+import { agenticRoute } from './routes/agentic.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const DEBUG_LOGS = process.env.OC_DEBUG_LOGS === 'true';
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+        if (DEBUG_LOGS) {
+            console.error(`[server] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${Date.now() - startedAt}ms`);
+        }
+    });
+    next();
+});
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -35,9 +51,12 @@ app.get('/api/health', (_req, res) => {
         version: '0.1.0',
         providers: {
             openrouter: !!process.env.OPENROUTER_API_KEY,
-            gemini: !!process.env.GEMINI_API_KEY,
+            openai: !!process.env.OPENAI_API_KEY,
+            gemini: !!process.env.GOOGLE_API_KEY,
+            anthropic: !!process.env.ANTHROPIC_API_KEY,
             ollama: !!process.env.OLLAMA_BASE_URL
-        }
+        },
+        debugLogs: DEBUG_LOGS
     });
 });
 
@@ -45,6 +64,11 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', generateRoute);
 app.use('/api', imagesRoute);
 app.use('/api', modelsRoute);
+app.use('/api/usage', usageRoute);
+app.use('/api/storage', storageRoute);
+app.use('/api', sessionsRoute);
+app.use('/api', clientConfigRoute);
+app.use('/api', agenticRoute);
 app.use('/v1', openaiRoute); // OpenAI-compatible
 
 app.listen(PORT, () => {

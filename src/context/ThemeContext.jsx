@@ -3,6 +3,8 @@
  * OpenContent IDE
  */
 
+/* eslint-disable react-refresh/only-export-components */
+
 import { createContext, useContext, useState, useEffect } from 'react';
 import { STORAGE_KEYS, THEMES } from '../config/constants';
 
@@ -25,7 +27,7 @@ export function ThemeProvider({ children }) {
     };
 
     return (
-        <ThemeContext.Provider value={{ theme, isDark, toggleTheme }}>
+        <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme }}>
             {children}
         </ThemeContext.Provider>
     );

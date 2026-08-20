@@ -8,6 +8,8 @@
 import { useState } from 'react';
 import './Icon.css';
 
+/* eslint-disable react-refresh/only-export-components */
+
 /**
  * Icon component that renders SVG icons with optional animations
  * 
@@ -76,7 +78,7 @@ function Icon({
  */
 export const ICONS = {
     // Core UI
-    LOGO: '/icons/logo.svg',
+    LOGO: '/brand/logo.svg',
     CLOSE: '/icons/close.svg',
     DOCK: '/icons/dock.svg',
     CHECK: '/icons/check.svg',

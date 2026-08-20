@@ -1,0 +1,430 @@
+.oc-artifact-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md, 16px);
+    width: 100%;
+    min-width: 0;
+    padding: var(--space-md, 16px);
+    background: var(--color-bg-secondary, #fafafa);
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: var(--radius-lg, 12px);
+    color: var(--color-text-primary, #000);
+}
+
+.oc-artifact-panel-header,
+.oc-artifact-panel-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-sm, 8px);
+}
+
+.oc-artifact-panel-title,
+.oc-artifact-panel-section-heading h3 {
+    margin: 0;
+    color: var(--color-text-primary, #000);
+    font-size: var(--font-size-md, 15px);
+    font-weight: var(--font-weight-semibold, 600);
+}
+
+.oc-artifact-panel-subtitle {
+    margin: 4px 0 0;
+    color: var(--color-text-secondary, #555);
+    font-size: var(--font-size-sm, 13px);
+    line-height: var(--line-height-normal, 1.5);
+}
+
+.oc-artifact-panel-count,
+.oc-artifact-panel-section-heading > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 7px;
+    border: 1px solid var(--color-border-strong, #ccc);
+    border-radius: var(--radius-full, 9999px);
+    color: var(--color-text-secondary, #555);
+    font-size: var(--font-size-xs, 11px);
+    font-weight: var(--font-weight-semibold, 600);
+}
+
+.oc-artifact-panel-selection {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs, 4px);
+    padding: 8px 10px;
+    background: var(--color-bg-primary, #fff);
+    border-left: 2px solid var(--color-accent, #000);
+    color: var(--color-text-secondary, #555);
+    font-size: var(--font-size-sm, 13px);
+}
+
+.oc-artifact-panel-artifacts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-sm, 8px);
+    max-height: 560px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.oc-artifact-panel-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: var(--space-xl, 32px) var(--space-md, 16px);
+    border: 1px dashed var(--color-border-strong, #ccc);
+    border-radius: var(--radius-md, 8px);
+    color: var(--color-text-secondary, #555);
+    text-align: center;
+}
+
+.oc-artifact-panel-empty strong {
+    color: var(--color-text-primary, #000);
+    font-size: var(--font-size-sm, 13px);
+}
+
+.oc-artifact-panel-empty span {
+    max-width: 280px;
+    font-size: var(--font-size-xs, 11px);
+    line-height: var(--line-height-normal, 1.5);
+}
+
+.oc-artifact-panel-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--color-bg-primary, #fff);
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: var(--radius-md, 8px);
+    transition: border-color var(--transition-normal, 200ms ease), box-shadow var(--transition-normal, 200ms ease);
+}
+
+.oc-artifact-panel-card:hover,
+.oc-artifact-panel-card.is-selected {
+    border-color: var(--color-text-primary, #000);
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+}
+
+.oc-artifact-panel-card.status-error {
+    border-color: #b91c1c;
+}
+
+.oc-artifact-panel-select {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-sm, 8px);
+    width: 100%;
+    min-width: 0;
+    padding: 8px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.oc-artifact-panel-select:disabled {
+    cursor: default;
+}
+
+.oc-artifact-panel-thumbnail {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 76px;
+    width: 76px;
+    height: 76px;
+    overflow: hidden;
+    background: var(--color-bg-tertiary, #f5f5f5);
+    border-radius: var(--radius-sm, 4px);
+}
+
+.oc-artifact-panel-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.oc-artifact-panel-selection-mark {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--color-border-strong, #ccc);
+    border-radius: 50%;
+    background: var(--color-bg-primary, #fff);
+    color: var(--color-text-primary, #000);
+}
+
+.oc-artifact-panel-card-heading {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+    gap: 5px;
+}
+
+.oc-artifact-panel-card-heading strong {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--color-text-primary, #000);
+    font-size: var(--font-size-sm, 13px);
+    font-weight: var(--font-weight-semibold, 600);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc-artifact-panel-card-heading > span {
+    display: inline-flex;
+    max-width: 100%;
+    padding: 2px 6px;
+    overflow: hidden;
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: var(--radius-sm, 4px);
+    color: var(--color-text-secondary, #555);
+    font-size: var(--font-size-xs, 11px);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc-artifact-panel-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 8px 8px;
+}
+
+.oc-artifact-panel-card-actions .btn {
+    min-width: 0;
+}
+
+.oc-artifact-panel-rename-form {
+    display: flex;
+    flex: 1 1 100%;
+    gap: 6px;
+}
+
+.oc-artifact-panel-rename-form input {
+    min-width: 0;
+    flex: 1;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--color-border-strong, #ccc);
+    border-radius: var(--radius-sm, 4px);
+    background: var(--color-bg-primary, #fff);
+    color: var(--color-text-primary, #000);
+    font: inherit;
+    font-size: var(--font-size-sm, 13px);
+}
+
+.oc-artifact-panel-rename-form input:focus,
+.oc-artifact-panel-select:focus-visible,
+.oc-artifact-panel-parent:focus-visible {
+    outline: 2px solid var(--color-text-primary, #000);
+    outline-offset: 2px;
+}
+
+.oc-artifact-panel-metadata {
+    margin: 0 8px 8px;
+    border-top: 1px solid var(--color-border-subtle, #f0f0f0);
+}
+
+.oc-artifact-panel-metadata summary {
+    padding: 8px 0 5px;
+    color: var(--color-text-secondary, #555);
+    cursor: pointer;
+    font-size: var(--font-size-xs, 11px);
+    font-weight: var(--font-weight-semibold, 600);
+}
+
+.oc-artifact-panel-metadata dl {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0;
+}
+
+.oc-artifact-panel-metadata-row {
+    display: grid;
+    grid-template-columns: minmax(54px, auto) 1fr;
+    gap: 8px;
+    align-items: baseline;
+    font-size: var(--font-size-xs, 11px);
+}
+
+.oc-artifact-panel-metadata-row dt {
+    color: var(--color-text-tertiary, #888);
+}
+
+.oc-artifact-panel-metadata-row dd {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--color-text-secondary, #555);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc-artifact-panel-parent {
+    max-width: 100%;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-primary, #000);
+    cursor: pointer;
+    font: inherit;
+    text-decoration: underline;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc-artifact-panel-prompt {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border-subtle, #f0f0f0);
+}
+
+.oc-artifact-panel-prompt-label {
+    color: var(--color-text-tertiary, #888);
+    font-size: var(--font-size-xs, 11px);
+}
+
+.oc-artifact-panel-prompt p {
+    max-height: 92px;
+    margin: 4px 0 0;
+    overflow-y: auto;
+    color: var(--color-text-secondary, #555);
+    font-size: var(--font-size-xs, 11px);
+    line-height: var(--line-height-normal, 1.5);
+    white-space: pre-wrap;
+}
+
+.oc-artifact-panel-timeline {
+    padding-top: var(--space-sm, 8px);
+    border-top: 1px solid var(--color-border, #e0e0e0);
+}
+
+.oc-artifact-panel-timeline-empty {
+    margin: 10px 0 0;
+    color: var(--color-text-tertiary, #888);
+    font-size: var(--font-size-sm, 13px);
+}
+
+.oc-artifact-panel-step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.oc-artifact-panel-step {
+    position: relative;
+    display: flex;
+    gap: var(--space-sm, 8px);
+    min-height: 44px;
+    padding: 0 0 12px;
+}
+
+.oc-artifact-panel-step:not(:last-child)::before {
+    position: absolute;
+    top: 22px;
+    bottom: 0;
+    left: 9px;
+    width: 1px;
+    background: var(--color-border, #e0e0e0);
+    content: '';
+}
+
+.oc-artifact-panel-step-marker {
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--color-border-strong, #ccc);
+    border-radius: 50%;
+    background: var(--color-bg-secondary, #fafafa);
+}
+
+.oc-artifact-panel-step.status-working .oc-artifact-panel-step-marker,
+.oc-artifact-panel-step.status-generating .oc-artifact-panel-step-marker {
+    border-color: var(--color-text-primary, #000);
+    box-shadow: 0 0 0 3px var(--color-bg-active, #e0e0e0);
+}
+
+.oc-artifact-panel-step.status-error .oc-artifact-panel-step-marker {
+    border-color: #b91c1c;
+}
+
+.oc-artifact-panel-step-marker > span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary, #888);
+}
+
+.oc-artifact-panel-step-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    gap: 3px;
+}
+
+.oc-artifact-panel-step-label {
+    color: var(--color-text-primary, #000);
+    font-size: var(--font-size-sm, 13px);
+    line-height: var(--line-height-normal, 1.5);
+}
+
+.oc-artifact-panel-step-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--color-text-tertiary, #888);
+    font-size: var(--font-size-xs, 11px);
+}
+
+.oc-artifact-panel-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (max-width: 560px) {
+    .oc-artifact-panel {
+        padding: var(--space-sm, 8px);
+    }
+
+    .oc-artifact-panel-artifacts {
+        grid-template-columns: 1fr;
+        max-height: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .oc-artifact-panel-card {
+        transition: none;
+    }
+}

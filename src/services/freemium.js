@@ -1,7 +1,6 @@
 import { FREE_LIMITS, PRO_LIMITS } from '../config/constants';
 
 const STORAGE_PREFIX = 'oc_usage';
-const MODEL_STORAGE_PREFIX = 'oc_model_usage';
 
 const getTodayKey = () => {
     return new Date().toISOString().slice(0, 10);
@@ -98,33 +97,4 @@ export const canUseAction = (action, { isPro, userId, projectCount = 0, currentP
         limit: target.limit,
         remaining
     };
-};
-
-const getModelStorageKey = (userId) => {
-    return `${MODEL_STORAGE_PREFIX}:${resolveUserKey(userId)}:${getTodayKey()}`;
-};
-
-const DEFAULT_MODEL_USAGE = {
-    glm_text: 0,
-    seedream_new: 0,
-    seedream_edit: 0
-};
-
-export const getModelUsage = (userId) => {
-    const raw = localStorage.getItem(getModelStorageKey(userId));
-    if (!raw) return { ...DEFAULT_MODEL_USAGE };
-
-    try {
-        const parsed = JSON.parse(raw);
-        return { ...DEFAULT_MODEL_USAGE, ...(parsed || {}) };
-    } catch {
-        return { ...DEFAULT_MODEL_USAGE };
-    }
-};
-
-export const incrementModelUsage = (key, userId, amount = 1) => {
-    const usage = getModelUsage(userId);
-    usage[key] = (usage[key] || 0) + amount;
-    localStorage.setItem(getModelStorageKey(userId), JSON.stringify(usage));
-    return usage;
 };

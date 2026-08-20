@@ -37,7 +37,7 @@ const initDB = () => {
  */
 export const saveMedia = async (file, name, options = {}) => {
     const db = await initDB();
-    const id = `asset_${Date.now()}`;
+    const id = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     // Convert to Base64 for easier preview and API handling
     const base64 = await fileToBase64(file);
@@ -49,6 +49,19 @@ export const saveMedia = async (file, name, options = {}) => {
         data: base64, // We store as base64 for simplicity in this version, could be Blob
         role: options.role || 'reference',
         tags: Array.isArray(options.tags) ? options.tags : [],
+        projectId: options.projectId || null,
+        versionId: options.versionId || null,
+        kind: options.kind || (options.source === 'generated' ? 'generated' : 'source'),
+        source: options.source || 'upload',
+        model: options.model || null,
+        prompt: options.prompt || null,
+        parameters: options.parameters || {},
+        version: options.version || null,
+        status: options.status || 'completed',
+        comments: options.comments || [],
+        referenceAssetIds: Array.isArray(options.referenceAssetIds) ? options.referenceAssetIds : [],
+        location: options.location || 'project',
+        parentAssetId: options.parentAssetId || null,
         createdAt: new Date().toISOString()
     };
 
@@ -88,6 +101,17 @@ export const deleteMedia = async (id) => {
         const request = store.delete(id);
 
         request.onsuccess = () => resolve(true);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const getMedia = async (id) => {
+    if (!id) return null;
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const request = transaction.objectStore(STORE_NAME).get(id);
+        request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => reject(request.error);
     });
 };

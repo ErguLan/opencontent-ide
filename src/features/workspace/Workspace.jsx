@@ -20,9 +20,10 @@ import Loader from '../../components/common/Loader';
 import Tooltip from '../../components/common/Tooltip';
 import Modal from '../../components/common/Modal';
 import { ROUTES, AGENT_CONFIG, STORAGE_KEYS } from '../../config/constants';
-import { AI_CONFIG, isAIConfigured, sendToAI, generateImage, analyzeImage, getTextModelOptions, getImageModelOptions, getActiveTextModel, getActiveImageModel, supportsVisualInputModel } from '../../services/ai';
+import { isAIConfigured, sendToAI, generateImage, analyzeImage, getTextModelOptions, getImageModelOptions, getVisionModelOptions, getActiveTextModel, getActiveImageModel, getActiveVisionModel, supportsVisualInputModel } from '../../services/ai';
 import {
     getLocalProjects,
+    getLocalProject,
     saveLocalProject,
     deleteLocalProject as deleteLocalProjectService
 } from '../../services/projectsLocal';
@@ -34,7 +35,7 @@ import {
     countMedia,
     fileToBase64
 } from '../../services/mediaService';
-import { canUseAction, getDailyUsage, incrementUsage, getPlanLimits, getModelUsage, incrementModelUsage } from '../../services/freemium';
+import { canUseAction, getDailyUsage, incrementUsage, getPlanLimits } from '../../services/freemium';
 import { trackMetric } from '../../services/metrics';
 import { queuePublication } from '../../services/publication';
 import { applyLogoOverlay } from '../../utils/imageProcessor';
@@ -42,6 +43,14 @@ import QuickPrompts from './components/QuickPrompts';
 import BatchMode, { BatchButton } from './components/BatchMode';
 import ContentCalendar, { CalendarToggle } from './components/ContentCalendar';
 import AgenticToggle, { getAgenticMode } from './components/AgenticToggle';
+import ImageConfigPanel, { getDefaultImageConfig } from './components/ImageConfigPanel';
+import { executeAgenticBatch, executeAgenticPipeline, looksLikeVisualRequest } from '../../services/ai/agenticPipeline';
+import { executeAgentTool } from '../../services/ai/toolRuntime';
+import { saveImageArtifact } from '../../services/imageArtifacts';
+import { getLocalSaveSettings } from '../../services/filePersistence';
+import { ALLOW_IMAGE_CONFIG_WITHOUT_AGENTIC } from '../../config/constants';
+import { buildBrandContextText, getBrandKit, getBrandKitAssetIds } from '../../services/brandKit';
+import { syncBrowserClientConfig, syncExternalSessions } from '../../services/externalSessions';
 import './components/FeatureComponents.css';
 
 // Agent states
@@ -68,7 +77,7 @@ function Workspace() {
     const location = useLocation();
     const navigate = useNavigate();
     const { id: routeProjectId } = useParams();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { toggleTheme } = useTheme();
     const { isAuthenticated, profile, isPro } = useAuth();
 
@@ -80,14 +89,22 @@ function Workspace() {
     const [projects, setProjects] = useState([]);
     const [projectsLoaded, setProjectsLoaded] = useState(false);
     const [currentProjectId, setCurrentProjectId] = useState(null);
+    const [projectStatus, setProjectStatus] = useState('idle');
+    const [projectLoadState, setProjectLoadState] = useState('idle');
+    const [projectLoadError, setProjectLoadError] = useState('');
+    const [projectLoadAttempt, setProjectLoadAttempt] = useState(0);
     const [paywall, setPaywall] = useState({ open: false, title: '', message: '', reason: '' });
-    const [infoModal, setInfoModal] = useState({ open: false, title: '', message: '' });
+    const [infoModal, setInfoModal] = useState({ open: false, title: '', message: '', canRetry: false });
     const [showProModal, setShowProModal] = useState(false);
     const [displayedText, setDisplayedText] = useState('');
     const [chatInput, setChatInput] = useState('');
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
     const [agenticMode, setAgenticMode] = useState(() => getAgenticMode());
+    const [imageConfig, setImageConfig] = useState(() => getDefaultImageConfig());
+    const [pendingArtifactSaves, setPendingArtifactSaves] = useState([]);
+    const [batchProgress, setBatchProgress] = useState(null);
+    const [hasRetryRequest, setHasRetryRequest] = useState(false);
     const [history, setHistory] = useState([]);
     const [versions, setVersions] = useState([]); // Array of { type, prompt, result, model, steps }
     const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
@@ -106,6 +123,9 @@ function Workspace() {
     const [selectedImageModel, setSelectedImageModel] = useState(
         () => getActiveImageModel()
     );
+    const [selectedVisionModel, setSelectedVisionModel] = useState(
+        () => getActiveVisionModel()
+    );
     const [imageProcessingMode] = useState(
         () => localStorage.getItem(STORAGE_KEYS.IMAGE_PROCESSING_MODE) || 'smart'
     );
@@ -117,6 +137,9 @@ function Workspace() {
     );
     const generationAbortControllerRef = useRef(null);
     const slowGenerationNoticeTimerRef = useRef(null);
+    const lastRequestRef = useRef(null);
+    const projectsLoadRequestRef = useRef(0);
+    const projectRouteRequestRef = useRef(0);
 
     // Media / Templates State
     const [mediaAssets, setMediaAssets] = useState([]);
@@ -129,25 +152,16 @@ function Workspace() {
     const chatFileInputRef = useRef(null);
     const textModelOptions = getTextModelOptions(isPro);
     const imageModelOptions = getImageModelOptions(isPro);
+    const visionModelOptions = getVisionModelOptions(isPro);
 
-    const getTextModelLabel = (modelId) => {
-        if (modelId === 'nvidia/nemotron-nano-12b-v2-vl:free') return t('workspace.model.textBestName');
-        return t('workspace.model.textFreeName');
+    const getModelLabel = (modelId, options) => {
+        const model = options.find((option) => option.id === modelId);
+        return model?.nickname || modelId || t('workspace.model.noModels');
     };
 
-    const getImageModelLabel = (modelId) => {
-        if (modelId === 'bytedance-seed/seedream-4.5') return t('workspace.model.visualBestName');
-        return t('workspace.model.visualFreeName');
-    };
-
-    const getTextModelBlurb = (modelId) => {
-        if (modelId === 'nvidia/nemotron-nano-12b-v2-vl:free') return t('workspace.model.textBestDesc');
-        return t('workspace.model.textFreeDesc');
-    };
-
-    const getImageModelBlurb = (modelId) => {
-        if (modelId === 'bytedance-seed/seedream-4.5') return isPro ? t('workspace.model.visualBestDescPro') : t('workspace.model.visualBestDescFree');
-        return t('workspace.model.visualFreeDesc');
+    const getModelBlurb = (modelId, options) => {
+        const model = options.find((option) => option.id === modelId);
+        return model?.provider || t('workspace.model.noModels');
     };
 
     // Typewriter effect for current version (only if new)
@@ -203,7 +217,7 @@ function Workspace() {
     useEffect(() => {
         if (!isAIConfigured()) {
             setAgentState(AGENT_STATES.NOT_CONFIGURED);
-            notifyAIIssue('API_KEY_NOT_CONFIGURED', 'Configuracion de IA requerida');
+            notifyAIIssue('API_KEY_NOT_CONFIGURED', t('errors.apiKeyNotConfiguredTitle'));
         }
         loadMedia();
     }, []);
@@ -214,56 +228,96 @@ function Workspace() {
     }, [isAuthenticated, profile?.uid, isPro]);
 
     useEffect(() => {
+        const timer = window.setInterval(async () => {
+            const imported = await syncExternalSessions();
+            if (imported > 0) loadProjects();
+            syncBrowserClientConfig({ activeTextModel: selectedTextModel, activeVisionModel: selectedVisionModel, activeImageModel: selectedImageModel });
+        }, 5000);
+        return () => window.clearInterval(timer);
+    }, [isAuthenticated, profile?.uid, isPro]);
+
+    useEffect(() => {
+        syncBrowserClientConfig({ activeTextModel: selectedTextModel, activeVisionModel: selectedVisionModel, activeImageModel: selectedImageModel });
+    }, [selectedTextModel, selectedVisionModel, selectedImageModel]);
+
+    useEffect(() => {
         setDailyUsage(getDailyUsage(usageUserId));
     }, [usageUserId]);
 
     useEffect(() => {
-        const textAllowed = textModelOptions.some((model) => model.id === selectedTextModel);
-        if (!textAllowed && textModelOptions.length > 0) {
-            setSelectedTextModel(textModelOptions[0].id);
+        const availableTextModels = getTextModelOptions(isPro);
+        const availableImageModels = getImageModelOptions(isPro);
+        const availableVisionModels = getVisionModelOptions(isPro);
+        const textAllowed = availableTextModels.some((model) => model.id === selectedTextModel);
+        if (!textAllowed && availableTextModels.length > 0) {
+            setSelectedTextModel(availableTextModels[0].id);
         }
 
-        const imageAllowed = imageModelOptions.some((model) => model.id === selectedImageModel);
-        if (!imageAllowed && imageModelOptions.length > 0) {
-            setSelectedImageModel(imageModelOptions[0].id);
+        const imageAllowed = availableImageModels.some((model) => model.id === selectedImageModel);
+        if (!imageAllowed && availableImageModels.length > 0) {
+            setSelectedImageModel(availableImageModels[0].id);
+        }
+
+        const visionAllowed = availableVisionModels.some((model) => model.id === selectedVisionModel);
+        if (!visionAllowed && availableVisionModels.length > 0) {
+            setSelectedVisionModel(availableVisionModels[0].id);
         }
     }, [isPro]);
 
     // Get initial prompt from navigation state
     useEffect(() => {
-        const initialPrompt = location.state?.initialPrompt;
+        const initialPrompt = typeof location.state?.initialPrompt === 'string' ? location.state.initialPrompt : null;
         if (initialPrompt && !initialPromptHandled.current) {
             initialPromptHandled.current = true;
             setCurrentPrompt(initialPrompt);
             navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-            // Only start generation if AI is configured
             if (isAIConfigured()) {
                 startGeneration(initialPrompt);
             }
         }
     }, [location.pathname, location.search, location.state, navigate]);
 
-    // Load user's projects from local IndexedDB
-    const loadProjects = async () => {
+    useEffect(() => {
+        const assetId = location.state?.attachAssetId;
+        if (!assetId) return;
+        const asset = mediaAssets.find((item) => item.id === assetId);
+        if (!asset) return;
+        setAttachedMedia({ id: asset.id, name: asset.name, data: asset.data, role: asset.role });
+        setActiveAssetIds((ids) => ids.includes(asset.id) ? ids : [...ids, asset.id]);
+        navigate(location.pathname, { replace: true, state: null });
+    }, [location.pathname, location.state, mediaAssets, navigate]);
+
+    // Load user's projects from local IndexedDB. Only the latest read may update the sidebar.
+    async function loadProjects() {
+        const requestId = ++projectsLoadRequestRef.current;
         try {
+            await syncExternalSessions();
             const localItems = (await getLocalProjects()).map((item) => ({
                 ...item,
                 cloudSynced: Boolean(item.cloudSynced)
             }));
 
-            // Sort by newest first
+            if (requestId !== projectsLoadRequestRef.current) return localItems;
             localItems.sort((a, b) => toMillis(b.updatedAt || b.createdAt) - toMillis(a.updatedAt || a.createdAt));
             setProjects(localItems);
+            return localItems;
+        } catch (error) {
+            console.error('Failed to load local projects', error);
+            if (routeProjectId && requestId === projectsLoadRequestRef.current) {
+                setProjectLoadState('error');
+                setProjectLoadError(error?.message || t('workspace.projectLoadErrorMessage'));
+            }
+            return [];
         } finally {
-            setProjectsLoaded(true);
+            if (requestId === projectsLoadRequestRef.current) setProjectsLoaded(true);
         }
-    };
+    }
 
     const openProjectInWorkspace = (project, source = 'manual') => {
         if (!project?.id) return;
 
         setCurrentProjectId(project.id);
-        setCurrentPrompt(project.prompt || '');
+        setCurrentPrompt(project.prompt || project.name || '');
         const loadedVersions = Array.isArray(project.versions) && project.versions.length > 0
             ? project.versions.map((version) => ({ ...version, isNew: false }))
             : (project.result ? [{
@@ -285,53 +339,79 @@ function Workspace() {
             setCurrentVersionIndex(safeIndex);
             setHistory(project.history || []);
             setAgentState(AGENT_STATES.COMPLETE);
+            setProjectStatus('complete');
         } else {
             setVersions([]);
             setCurrentVersionIndex(-1);
             setHistory(project.history || []);
-            setAgentState(AGENT_STATES.IDLE);
+            setProjectStatus(project.status || 'draft');
+            setAgentState(project.status === 'error' ? AGENT_STATES.ERROR : AGENT_STATES.IDLE);
+            setErrorMessage(project.errorMessage || '');
+            if (project.prompt) {
+                lastRequestRef.current = {
+                    prompt: project.prompt,
+                    isIteration: false,
+                    projectId: project.id
+                };
+                setHasRetryRequest(true);
+            }
         }
 
         setErrorMessage('');
         trackMetric('project_opened', { projectId: project.id, source });
     };
 
-    useEffect(() => {
-        if (!projectsLoaded || !routeProjectId) return;
-        const matchingProject = projects.find((project) => project.id === routeProjectId);
+    const handleSelectProject = (project) => {
+        if (!project?.id || project.id === currentProjectId) return;
+        if (isGenerating) {
+            openInfoNotice(t('workspace.projectSwitchBlockedTitle'), t('workspace.projectSwitchBlockedMessage'));
+            return;
+        }
+        navigate(ROUTES.PROJECT.replace(':id', project.id));
+    };
 
-        if (!matchingProject) {
-            openInfoNotice(
-                'Proyecto no encontrado',
-                'No encontramos un proyecto con ese enlace local. Crea uno nuevo o abre otro desde la lista.'
-            );
-            navigate(ROUTES.WORKSPACE, { replace: true });
+    useEffect(() => {
+        const requestId = ++projectRouteRequestRef.current;
+        if (!routeProjectId) {
+            setProjectLoadState('idle');
+            return;
+        }
+        if (!projectsLoaded) {
+            setProjectLoadState('loading');
             return;
         }
 
-        if (currentProjectId !== matchingProject.id) {
-            openProjectInWorkspace(matchingProject, 'url');
-        }
-    }, [projectsLoaded, projects, routeProjectId, currentProjectId, navigate]);
+        setProjectLoadState('loading');
+        setProjectLoadError('');
+        let cancelled = false;
 
-    useEffect(() => {
-        if (!projectsLoaded) return;
+        const loadProject = async () => {
+            try {
+                const localProject = await getLocalProject(routeProjectId);
+                if (cancelled || requestId !== projectRouteRequestRef.current) return;
 
-        if (currentProjectId) {
-            localStorage.setItem(STORAGE_KEYS.LAST_PROJECT, currentProjectId);
-            if (routeProjectId !== currentProjectId) {
-                navigate(ROUTES.PROJECT.replace(':id', currentProjectId), { replace: true });
+                if (!localProject) {
+                    setProjectLoadState('error');
+                    setProjectLoadError(t('workspace.projectNotFoundMessage'));
+                    return;
+                }
+
+                openProjectInWorkspace(localProject, 'url');
+                localStorage.setItem(STORAGE_KEYS.LAST_PROJECT, localProject.id);
+                setProjectLoadState('ready');
+            } catch (error) {
+                if (cancelled || requestId !== projectRouteRequestRef.current) return;
+                console.error('Failed to open local project', error);
+                setProjectLoadState('error');
+                setProjectLoadError(error?.message || t('workspace.projectLoadErrorMessage'));
             }
-            return;
-        }
+        };
 
-        if (routeProjectId) {
-            const exists = projects.some((project) => project.id === routeProjectId);
-            if (!exists) {
-                navigate(ROUTES.WORKSPACE, { replace: true });
-            }
-        }
-    }, [projectsLoaded, currentProjectId, routeProjectId, projects, navigate]);
+        loadProject();
+        return () => {
+            cancelled = true;
+        };
+    }, [projectsLoaded, routeProjectId, projectLoadAttempt]);
 
     const refreshDailyUsage = () => {
         setDailyUsage(getDailyUsage(usageUserId));
@@ -404,58 +484,21 @@ function Workspace() {
     const saveModelSelection = () => {
         localStorage.setItem(STORAGE_KEYS.SELECTED_TEXT_MODEL, selectedTextModel);
         localStorage.setItem(STORAGE_KEYS.SELECTED_IMAGE_MODEL, selectedImageModel);
+        localStorage.setItem(STORAGE_KEYS.SELECTED_VISION_MODEL, selectedVisionModel || '');
         setShowModelModal(false);
         trackMetric('model_selection_saved', {
             textModel: selectedTextModel,
             imageModel: selectedImageModel,
+            visionModel: selectedVisionModel,
             plan: isPro ? 'PRO' : 'FREE'
         });
     };
 
     const checkTextModelAllowance = () => {
-        if (isPro) return true;
-        if (selectedTextModel !== 'nvidia/nemotron-nano-12b-v2-vl:free') return true;
-
-        const modelUsage = getModelUsage(usageUserId);
-        if ((modelUsage.glm_text || 0) >= 2) {
-            setInfoModal({
-                open: true,
-                title: t('workspace.model.glmLimitTitle'),
-                message: t('workspace.model.glmLimitMessage')
-            });
-            trackMetric('glm_free_limit_hit', { used: modelUsage.glm_text || 0 });
-            return false;
-        }
         return true;
     };
 
-    const checkSeedreamAllowance = (mode = 'new') => {
-        if (isPro) return true;
-        if (selectedImageModel !== 'bytedance-seed/seedream-4.5') return true;
-
-        const modelUsage = getModelUsage(usageUserId);
-        const usedNew = modelUsage.seedream_new || 0;
-        const usedEdit = modelUsage.seedream_edit || 0;
-
-        if (mode === 'new' && usedNew >= 5) {
-            setInfoModal({
-                open: true,
-                title: t('workspace.model.seedreamNewLimitTitle'),
-                message: t('workspace.model.seedreamNewLimitMessage')
-            });
-            trackMetric('seedream_new_limit_hit', { used: usedNew });
-            return false;
-        }
-
-        if (mode === 'edit' && usedEdit >= 2) {
-            setInfoModal({
-                open: true,
-                title: t('workspace.model.seedreamEditLimitTitle'),
-                message: t('workspace.model.seedreamEditLimitMessage')
-            });
-            trackMetric('seedream_edit_limit_hit', { used: usedEdit });
-            return false;
-        }
+    const checkSeedreamAllowance = () => {
         return true;
     };
 
@@ -495,45 +538,51 @@ function Workspace() {
     };
 
     const normalizeAIError = (message) => {
-        if (!message) return 'Something went wrong';
-        if (message === 'API_KEY_NOT_CONFIGURED' || message === 'OPENROUTER_API_KEY_NOT_CONFIGURED' || message === 'GEMINI_API_KEY_NOT_CONFIGURED') {
-            return 'La API de IA no esta configurada. Revisa tus llaves en .env para continuar.';
+        const rawMessage = String(message || '').trim();
+        if (!rawMessage) return t('errors.generic');
+        if (rawMessage === 'API_KEY_NOT_CONFIGURED' || rawMessage.includes('API_KEY')) {
+            return t('errors.apiKeyNotConfigured');
         }
-        if (message === 'REQUEST_TIMEOUT') {
-            return 'El modelo tardo demasiado en responder. Intenta de nuevo o cambia de modelo.';
+        if (rawMessage === 'REQUEST_TIMEOUT') return t('errors.requestTimeout');
+        if (rawMessage === 'REQUEST_ABORTED') return t('errors.requestAborted');
+        if (rawMessage === 'EMPTY_AI_RESPONSE') return t('errors.emptyAIResponse');
+        if (rawMessage === 'AI_REQUEST_FAILED') return t('errors.aiRequestFailed');
+        if (rawMessage === 'TEXT_MODEL_NOT_SELECTED') return t('errors.textModelNotSelected');
+        if (rawMessage === 'TEXT_MODEL_NOT_SUPPORTED') return t('errors.textModelNotSupported');
+        if (rawMessage === 'IMAGE_MODEL_NOT_SELECTED') return t('errors.imageModelNotSelected');
+        if (rawMessage === 'VISION_MODEL_NOT_SELECTED') return t('errors.visionModelNotSelected');
+        if (rawMessage === 'VISION_MODEL_NOT_SUPPORTED') return t('errors.visionModelNotSupported');
+        if (rawMessage === 'IMAGE_TASK_LIMIT_REACHED') return t('errors.imageTaskLimit');
+        if (rawMessage.includes('NO_IMAGE_IN_RESPONSE')) return t('errors.noImageInResponse');
+        if (rawMessage === 'IMAGE_GENERATION_FAILED' || rawMessage === 'IMAGE_ANALYSIS_FAILED') {
+            return t('errors.imageGenerationFailed');
         }
-        if (message === 'REQUEST_ABORTED') {
-            return 'Generacion cancelada.';
+        if (rawMessage.includes('PROVIDER_HTTP_429') || rawMessage.includes('429')) {
+            return `${t('errors.rateLimit')}\n\n${rawMessage}`;
         }
-        if (message === 'EMPTY_AI_RESPONSE') {
-            return 'El modelo no devolvio contenido util. Prueba reformular el prompt o cambiar de modelo.';
-        }
-        if (message === 'AI_REQUEST_FAILED') {
-            return 'La solicitud al modelo fallo. Intenta nuevamente en unos segundos.';
-        }
-        if (String(message).includes('NO_IMAGE_IN_RESPONSE')) {
-            return 'El modelo respondio sin imagen. Puedes reintentar o probar otro modelo visual.';
-        }
-        if (message === 'IMAGE_GENERATION_FAILED' || message === 'IMAGE_ANALYSIS_FAILED') {
-            return 'No se pudo completar la operacion visual. Cambia de modelo o vuelve a intentar.';
-        }
-        return message;
+        return rawMessage;
     };
 
     const openInfoNotice = (title, message) => {
         setInfoModal({
             open: true,
             title,
-            message
+            message,
+            canRetry: false
         });
     };
 
-    const notifyAIIssue = (rawMessage, title = 'Aviso del modelo de IA') => {
+    function notifyAIIssue(rawMessage, title = t('errors.providerErrorTitle')) {
         const normalized = normalizeAIError(rawMessage);
         setErrorMessage(normalized);
-        openInfoNotice(title, normalized);
+        setInfoModal({
+            open: true,
+            title,
+            message: normalized,
+            canRetry: Boolean(lastRequestRef.current?.prompt)
+        });
         return normalized;
-    };
+    }
 
     const clearSlowGenerationNoticeTimer = () => {
         if (slowGenerationNoticeTimerRef.current) {
@@ -542,7 +591,7 @@ function Workspace() {
         }
     };
 
-    const cancelCurrentGeneration = (customMessage = 'Generacion cancelada.') => {
+    const cancelCurrentGeneration = (customMessage = t('errors.requestAborted')) => {
         clearSlowGenerationNoticeTimer();
         if (generationAbortControllerRef.current) {
             generationAbortControllerRef.current.abort();
@@ -550,6 +599,13 @@ function Workspace() {
         }
         setAgentState(AGENT_STATES.ERROR);
         setErrorMessage(customMessage);
+        setProjectStatus('error');
+        setBatchProgress((progress) => progress?.status === 'working'
+            ? { ...progress, status: 'cancelled' }
+            : progress);
+        setAgentSteps((steps) => steps.map((step) => (
+            step.status === 'working' ? { ...step, status: 'error' } : step
+        )));
         setIsGenerating(false);
         setIsIterating(false);
     };
@@ -621,7 +677,7 @@ function Workspace() {
     };
 
     // Media Logic
-    const loadMedia = async () => {
+    async function loadMedia() {
         try {
             const assets = await getAllMedia();
             const normalized = assets.map((asset) => ({
@@ -712,8 +768,10 @@ function Workspace() {
     };
 
     // Start agentic generation flow
-    const startGeneration = async (prompt, isIteration = false) => {
+    async function startGeneration(prompt, isIteration = false) {
         if (isGenerating) return;
+        const normalizedPrompt = typeof prompt === 'string' ? prompt.trim() : String(prompt || '').trim();
+        if (!normalizedPrompt) return;
         if (!isAIConfigured()) {
             setAgentState(AGENT_STATES.NOT_CONFIGURED);
             notifyAIIssue('API_KEY_NOT_CONFIGURED');
@@ -724,6 +782,12 @@ function Workspace() {
         if (isIteration && !gateAction('iteration', { currentProjectIterations: versions.length })) return;
         if (!checkTextModelAllowance()) return;
 
+        lastRequestRef.current = {
+            prompt: normalizedPrompt,
+            isIteration,
+            projectId: currentProjectId
+        };
+        setHasRetryRequest(true);
         setIsGenerating(true);
         setIsIterating(isIteration);
         const requestController = new AbortController();
@@ -741,21 +805,26 @@ function Workspace() {
             }
         }, 18000);
 
+        let projectId = currentProjectId;
         try {
-            let projectId = currentProjectId;
+            setProjectStatus('generating');
 
             // Local-first project storage (IndexedDB)
             if (!isIteration) {
                 const projectData = {
-                    name: prompt.substring(0, 50),
-                    prompt: prompt,
+                    id: projectId || undefined, // let saveLocalProject generate if null
+                    name: normalizedPrompt.substring(0, 50),
+                    prompt: normalizedPrompt,
                     type: 'content',
+                    status: 'generating',
+                    errorMessage: '',
                     createdAt: new Date().toISOString()
                 };
 
-                const localProj = await saveLocalProject({ ...projectData, id: projectId });
+                const localProj = await saveLocalProject(projectData);
                 projectId = localProj.id;
                 setCurrentProjectId(projectId);
+                lastRequestRef.current = { ...lastRequestRef.current, projectId };
                 await loadProjects();
             }
 
@@ -769,17 +838,125 @@ function Workspace() {
             let fullPrompt = prompt;
             let iterativeContext = "";
             const activeAssets = mediaAssets.filter((asset) => activeAssetIds.includes(asset.id));
-            const activeLogos = activeAssets.filter((asset) => asset.role === 'logo');
+            const brandKit = getBrandKit();
+            const brandContext = buildBrandContextText(brandKit);
+            const configuredBrandAssets = mediaAssets.filter((asset) => getBrandKitAssetIds(brandKit).includes(asset.id));
+            const generationAssets = [...activeAssets, ...configuredBrandAssets]
+                .filter((asset, index, assets) => assets.findIndex((item) => item.id === asset.id) === index);
+            const activeLogos = generationAssets.filter((asset) => asset.role === 'logo' || brandKit.logoAssetIds.includes(asset.id));
             const templateAssets = activeAssets.filter((asset) => asset.role === 'template');
+
+            if (agenticMode) {
+                const sourceImages = [
+                    attachedMedia?.data,
+                    ...generationAssets.map((asset) => asset.data)
+                ].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
+                const visionModel = selectedVisionModel;
+
+                setAgentSteps([{ id: 'agentic-plan', text: t('agentic.planning'), status: 'working' }]);
+                setAgentState(AGENT_STATES.ANALYZING);
+
+                const agenticResult = await executeAgenticPipeline({
+                    prompt: normalizedPrompt,
+                    selectedTextModel,
+                    selectedImageModel,
+                    visionModel,
+                    imageConfig: (agenticMode || ALLOW_IMAGE_CONFIG_WITHOUT_AGENTIC) ? imageConfig : {},
+                    sourceImages,
+                    projectId,
+                    projectName: currentPrompt || normalizedPrompt,
+                    version: versions.length + 1,
+                    preferNativeTools: localStorage.getItem(STORAGE_KEYS.TOOL_CALLING_ENABLED) !== 'false',
+                    preferOpenRouterImageTool: true,
+                    t,
+                    signal: requestController.signal,
+                    onSteps: setAgentSteps,
+                    onChunk: setDisplayedText,
+                    brandContext,
+                    brandAssetIds: getBrandKitAssetIds(brandKit),
+                    hasVisualReference: generationAssets.length > 0 || Boolean(attachedMedia)
+                });
+
+                setPendingArtifactSaves(agenticResult.pendingSaves || []);
+
+                const cleanText = agenticResult.text.trim();
+                const newUserMessage = { role: 'user', content: normalizedPrompt };
+                const textAssistantMessage = { role: 'assistant', content: cleanText };
+                const nextHistory = isIteration
+                    ? [...history, newUserMessage, textAssistantMessage]
+                    : [newUserMessage, textAssistantMessage];
+                const newVersion = {
+                    type: 'agentic',
+                    prompt: normalizedPrompt,
+                    result: cleanText,
+                    model: agenticResult.model,
+                    imageUrl: agenticResult.imageUrl,
+                    imageModel: agenticResult.imageModel,
+                    imagePrompt: agenticResult.imagePrompt,
+                    imageAssetId: agenticResult.images?.at(-1)?.assetId || null,
+                    imageRevisions: agenticResult.images || [],
+                    timestamp: new Date().toISOString(),
+                    isNew: true,
+                    agenticSteps: agenticResult.plan,
+                    steps: agenticResult.plan.map((step, index) => ({
+                        id: `agentic-${index}`,
+                        text: step.description || step.prompt,
+                        status: 'done'
+                    }))
+                };
+                const versionsSnapshot = [...versions, newVersion];
+                const newVersionIndex = versionsSnapshot.length - 1;
+
+                setAttachedMedia(null);
+                setHistory(nextHistory);
+                setVersions(versionsSnapshot);
+                setCurrentVersionIndex(newVersionIndex);
+                setAgentSteps((steps) => steps.map((step) => ({ ...step, status: 'done' })));
+                setAgentState(AGENT_STATES.COMPLETE);
+                setProjectStatus('complete');
+                incrementUsage('generate', usageUserId);
+                if (isIteration) incrementUsage('iteration', usageUserId);
+                if (agenticResult.imageUrl) incrementUsage('image', usageUserId);
+                refreshDailyUsage();
+                trackMetric('agentic_complete', {
+                    projectId,
+                    model: selectedTextModel,
+                    imageModel: agenticResult.imageModel,
+                    stepCount: agenticResult.plan.length,
+                    hasImage: Boolean(agenticResult.imageUrl)
+                });
+
+                if (projectId) {
+                    const nextPromptValue = isIteration
+                        ? `${currentPrompt}\n> ${normalizedPrompt}`
+                        : normalizedPrompt;
+                    await saveLocalProject({
+                        id: projectId,
+                        status: 'complete',
+                        errorMessage: '',
+                        result: cleanText,
+                        imageUrl: agenticResult.imageUrl,
+                        prompt: nextPromptValue,
+                        history: nextHistory,
+                        versions: versionsSnapshot,
+                        currentVersionIndex: newVersionIndex
+                    });
+                    await loadProjects();
+                    if (!routeProjectId) {
+                        navigate(ROUTES.PROJECT.replace(':id', projectId), { replace: true });
+                    }
+                }
+                return;
+            }
 
             // INTENT ROUTER: Determine the primary pipeline
             const isCasualPrompt = isCasualChatPrompt(prompt);
-            const hasInitialImage = Boolean(attachedMedia || templateAssets[0] || activeAssets[0]);
+            const hasInitialImage = Boolean(attachedMedia || templateAssets[0] || generationAssets[0]);
             const isEditIntent = !isCasualPrompt && hasInitialImage && isImageEditRequest(prompt);
             const isFreshGenIntent = !isCasualPrompt && !isEditIntent && shouldAllowAutoImage(prompt, hasInitialImage);
 
-            const selectedPrimaryAsset = attachedMedia || templateAssets[0] || activeAssets[0] || null;
-            const imageUrls = [selectedPrimaryAsset?.data, ...activeAssets.map((asset) => asset.data)]
+            const selectedPrimaryAsset = attachedMedia || templateAssets[0] || generationAssets[0] || null;
+            const imageUrls = [selectedPrimaryAsset?.data, ...generationAssets.map((asset) => asset.data)]
                 .filter(Boolean)
                 .filter((value, index, arr) => arr.indexOf(value) === index);
             const modelSupportsVisualInput = supportsVisualInputModel(selectedTextModel);
@@ -798,7 +975,7 @@ function Workspace() {
             let scopedHistory = [];
             let safeBaseVersionIndex = getSafeVersionIndex(currentVersionIndex);
             let baseVersion = safeBaseVersionIndex >= 0 ? versions[safeBaseVersionIndex] : null;
-            const assetContext = buildAssetContext(activeAssets);
+            const assetContext = buildAssetContext(generationAssets);
             const taskModeInstruction = buildTaskModeInstruction(creativeTaskMode);
 
             if (isIteration && versions.length > 0) {
@@ -821,11 +998,15 @@ function Workspace() {
             const shouldInjectCreativeContext = !isCasualPrompt && (
                 isImageEditRequest(prompt) ||
                 shouldAllowAutoImage(prompt, Boolean(currentImageUrl)) ||
-                Boolean(currentImageUrl && activeAssets.length > 0)
+                Boolean(currentImageUrl && generationAssets.length > 0)
             );
 
             if (shouldInjectCreativeContext) {
                 fullPrompt = `${fullPrompt}${taskModeInstruction}${assetContext}`;
+            }
+
+            if (brandContext && !isCasualPrompt) {
+                fullPrompt = `${fullPrompt}\n\n${brandContext}`;
             }
 
             if (currentImageUrl && imageProcessingMode === 'analysis_send' && modelSupportsVisualInput) {
@@ -860,10 +1041,24 @@ function Workspace() {
                 const logoLine = activeLogos.length > 0
                     ? `\nIncorporate these brand logos naturally: ${activeLogos.map((asset) => asset.name).join(', ')}.`
                     : '';
-                const smartImagePrompt = `Edit this template with premium quality and preserve brand consistency.\nUser request: ${prompt}${logoLine}\nAdd realistic lighting/effects only if requested.`;
-                const directImage = await generateImage(smartImagePrompt, selectedImageModel, 3, 2000, { signal: requestController.signal });
+                const smartImagePrompt = `Edit this template with premium quality and preserve brand consistency.\nUser request: ${prompt}${logoLine}\n${brandContext}\nAdd realistic lighting/effects only if requested.`;
+                const directImage = await generateImage(smartImagePrompt, selectedImageModel, {
+                    signal: requestController.signal,
+                    imageUrl: imageUrls[0] || null,
+                    imageUrls,
+                    ...imageConfig
+                });
 
                 if (directImage?.success) {
+                    const directArtifact = await saveImageArtifact(directImage.imageUrl, {
+                        projectId,
+                        projectName: normalizedPrompt,
+                        version: versions.length + 1,
+                        kind: 'edited',
+                        model: directImage.model || selectedImageModel,
+                        prompt: smartImagePrompt,
+                        settings: undefined
+                    });
                     setAttachedMedia(null);
                     const cleanText = 'Edicion visual aplicada segun tu solicitud. Si quieres, ahora te genero texto optimizado para esta nueva imagen.';
                     const newUserMessage = { role: 'user', content: prompt };
@@ -881,6 +1076,8 @@ function Workspace() {
                         imageUrl: directImage.imageUrl,
                         imageModel: directImage.model || selectedImageModel,
                         imagePrompt: smartImagePrompt,
+                        imageAssetId: directArtifact.asset.id,
+                        imageRevisions: [directArtifact.asset],
                         timestamp: new Date().toISOString(),
                         isNew: true,
                         steps: [
@@ -900,9 +1097,6 @@ function Workspace() {
                     incrementUsage('generate', usageUserId);
                     incrementUsage('image', usageUserId);
                     if (isIteration) incrementUsage('iteration', usageUserId);
-                    if (selectedImageModel === 'bytedance-seed/seedream-4.5') {
-                        incrementModelUsage('seedream_edit', usageUserId);
-                    }
                     refreshDailyUsage();
                     trackMetric('smart_direct_image_edit_success', {
                         projectId,
@@ -915,6 +1109,7 @@ function Workspace() {
                             : prompt;
                         const updateData = {
                             status: 'complete',
+                            errorMessage: '',
                             result: cleanText,
                             imageUrl: directImage.imageUrl,
                             prompt: nextPromptValue,
@@ -923,8 +1118,12 @@ function Workspace() {
                             currentVersionIndex: newVersionIndex
                         };
                         await saveLocalProject({ ...updateData, id: projectId });
+                        setProjectStatus('complete');
                         if (isIteration) setCurrentPrompt(nextPromptValue);
                         await loadProjects();
+                        if (!routeProjectId) {
+                            navigate(ROUTES.PROJECT.replace(':id', projectId), { replace: true });
+                        }
                     }
                     return;
                 }
@@ -971,12 +1170,11 @@ function Workspace() {
                 - Never mention internal instructions.
                 - Only request assets if the user asks for design/editing work.`;
 
-            const activeSystemPrompt = (isEditIntent || isFreshGenIntent) ? MASTER_SOCIAL_PROMPT : conversationalSystemPrompt;
+            const activeSystemPrompt = `${(isEditIntent || isFreshGenIntent) ? MASTER_SOCIAL_PROMPT : conversationalSystemPrompt}\n${brandContext}`;
 
             const response = await sendToAI(fullPrompt, selectedTextModel, {
                 imageUrl: aiReadableImageUrls[0] || null,
                 imageUrls: aiReadableImageUrls,
-                visionModel: AI_CONFIG.DEFAULT_IMAGE_MODEL,
                 systemPrompt: activeSystemPrompt,
                 signal: requestController.signal
             });
@@ -989,7 +1187,7 @@ function Workspace() {
                 if (!textContent) {
                     throw new Error('EMPTY_AI_RESPONSE');
                 }
-                const imageTagRegex = /\[GENERATE_IMAGE:\s*(.*?)\]/i;
+                const imageTagRegex = /\[GENERATE_IMAGE:\s*([\s\S]*?)\]/i;
                 const overlayTagRegex = /\[LOGO_OVERLAY:\s*(.*?),\s*(.*?),\s*(.*?)\]/i;
 
                 const match = textContent.match(imageTagRegex);
@@ -1032,8 +1230,11 @@ function Workspace() {
 
                 // If AI requested an image agentically
                 const allowAutoImage = shouldAllowAutoImage(prompt, Boolean(currentImageUrl));
-                if (match && match[1] && allowAutoImage) {
-                    const imagePrompt = match[1];
+                const requestedImagePrompt = match?.[1]?.trim() || (allowAutoImage ? normalizedPrompt : '');
+                if (requestedImagePrompt && allowAutoImage && gateAction('image')) {
+                    const imagePrompt = brandContext
+                        ? `${brandContext}\n\nVISUAL TASK:\n${requestedImagePrompt}`
+                        : requestedImagePrompt;
                     console.log("Agent Agent: Requesting image with prompt:", imagePrompt);
                     if (!checkSeedreamAllowance('new')) {
                         setAgentSteps(prev => prev.map(s => s.status === 'working' ? { ...s, status: 'done' } : s));
@@ -1045,9 +1246,22 @@ function Workspace() {
                             { id: 'img-' + Date.now(), text: `AI Tool: Generating requested visual...`, status: 'working' }
                         ]);
 
-                        const imgResponse = await generateImage(imagePrompt, selectedImageModel, 3, 2000, { signal: requestController.signal });
+                        const imgResponse = await generateImage(imagePrompt, selectedImageModel, {
+                            signal: requestController.signal,
+                            imageUrl: imageUrls[0] || null,
+                            imageUrls,
+                            ...((agenticMode || ALLOW_IMAGE_CONFIG_WITHOUT_AGENTIC) ? imageConfig : {})
+                        });
 
                         if (imgResponse.success) {
+                            const generatedArtifact = await saveImageArtifact(imgResponse.imageUrl, {
+                                projectId,
+                                projectName: normalizedPrompt,
+                                version: versions.length + 1,
+                                kind: 'generated',
+                                model: imgResponse.model || selectedImageModel,
+                                prompt: imagePrompt
+                            });
                             let finalImageUrl = imgResponse.imageUrl;
 
                             // Apply deterministic Logo Overlay if requested
@@ -1080,7 +1294,9 @@ function Workspace() {
                                 ...versionsSnapshot[newVersionIndex],
                                 imageUrl: finalImageUrl,
                                 imageModel: imgResponse.model,
-                                imagePrompt: imagePrompt
+                                imagePrompt: imagePrompt,
+                                imageAssetId: generatedArtifact.asset.id,
+                                imageRevisions: [generatedArtifact.asset]
                             };
                             setVersions(prev => prev.map((v, i) =>
                                 i === newVersionIndex
@@ -1089,9 +1305,6 @@ function Workspace() {
                             ));
                             setAgentSteps(prev => prev.map(s => ({ ...s, status: 'done' })));
                             incrementUsage('image', usageUserId);
-                            if (selectedImageModel === 'bytedance-seed/seedream-4.5') {
-                                incrementModelUsage('seedream_new', usageUserId);
-                            }
                         } else {
                             notifyAIIssue(imgResponse.error || 'The image tool failed to respond.', 'Error de herramienta visual');
                             setAgentSteps(prev => prev.map(s => s.status === 'working' ? { ...s, status: 'error', text: 'Image tool error' } : s));
@@ -1102,9 +1315,6 @@ function Workspace() {
                 setAgentState(AGENT_STATES.COMPLETE);
                 incrementUsage('generate', usageUserId);
                 if (isIteration) incrementUsage('iteration', usageUserId);
-                if (selectedTextModel === 'nvidia/nemotron-nano-12b-v2-vl:free' && !isPro) {
-                    incrementModelUsage('glm_text', usageUserId);
-                }
                 refreshDailyUsage();
                 trackMetric(isIteration ? 'iteration_success' : 'generation_success', {
                     projectId,
@@ -1121,6 +1331,7 @@ function Workspace() {
                     const latestVersion = versionsSnapshot[newVersionIndex];
                     const updateData = {
                         status: 'complete',
+                        errorMessage: '',
                         result: cleanText,
                         imageUrl: currentImageResult || latestVersion?.imageUrl || null,
                         prompt: nextPromptValue,
@@ -1130,8 +1341,12 @@ function Workspace() {
                     };
 
                     await saveLocalProject({ ...updateData, id: projectId });
+                    setProjectStatus('complete');
                     if (isIteration) setCurrentPrompt(nextPromptValue);
                     await loadProjects();
+                    if (!routeProjectId) {
+                        navigate(ROUTES.PROJECT.replace(':id', projectId), { replace: true });
+                    }
                 }
             } else {
                 throw new Error(response.error || 'Generation failed');
@@ -1139,13 +1354,305 @@ function Workspace() {
 
         } catch (error) {
             setAgentState(AGENT_STATES.ERROR);
-            notifyAIIssue(error.message || 'Something went wrong');
+            const normalized = notifyAIIssue(error.message || 'AI_REQUEST_FAILED');
+            setProjectStatus('error');
+            setAgentSteps((steps) => steps.map((step) => (
+                step.status === 'working' ? { ...step, status: 'error' } : step
+            )));
+            if (projectId) {
+                try {
+                    await saveLocalProject({
+                        id: projectId,
+                        status: 'error',
+                        errorMessage: normalized,
+                        prompt: normalizedPrompt,
+                        lastAttemptAt: new Date().toISOString()
+                    });
+                    await loadProjects();
+                } catch (persistError) {
+                    console.error('Failed to persist generation error', persistError);
+                }
+            }
         } finally {
             clearSlowGenerationNoticeTimer();
             generationAbortControllerRef.current = null;
             setIsGenerating(false);
             setIsIterating(false);
         }
+    }
+
+    const handleBatchConfirm = async (count) => {
+        const batchPrompt = chatInput.trim();
+        const total = Math.min(Math.max(Number(count) || 0, 2), 10);
+        if (!batchPrompt || !total || isGenerating) return;
+        if (!isAIConfigured()) {
+            setAgentState(AGENT_STATES.NOT_CONFIGURED);
+            notifyAIIssue('API_KEY_NOT_CONFIGURED');
+            return;
+        }
+        if (!currentProjectId && !gateAction('project')) return;
+        if (!checkTextModelAllowance()) return;
+
+        const batchBrandKit = getBrandKit();
+        const batchBrandContext = buildBrandContextText(batchBrandKit);
+        const batchBrandAssetIds = getBrandKitAssetIds(batchBrandKit);
+        const sourceImages = [
+            attachedMedia?.data,
+            ...mediaAssets
+                .filter((asset) => activeAssetIds.includes(asset.id) || batchBrandAssetIds.includes(asset.id))
+                .map((asset) => asset.data)
+        ].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index);
+        const requestController = new AbortController();
+        const settings = getLocalSaveSettings();
+        let projectId = currentProjectId;
+        let versionsSnapshot = Array.isArray(versions) ? [...versions] : [];
+        let historySnapshot = Array.isArray(history) ? [...history] : [];
+        let completedCount = 0;
+
+        setShowBatchModal(false);
+        setChatInput('');
+        setCurrentPrompt((currentPromptValue) => currentPromptValue || batchPrompt);
+        setIsGenerating(true);
+        setIsIterating(false);
+        setBatchProgress({ current: 0, total, status: 'working' });
+        setAgentState(AGENT_STATES.ANALYZING);
+        setProjectStatus('generating');
+        setErrorMessage('');
+        setAgentSteps([{
+            id: 'batch-progress',
+            text: t('workspace.batch.progress', { current: 0, total }),
+            status: 'working'
+        }]);
+        generationAbortControllerRef.current = requestController;
+        lastRequestRef.current = { prompt: batchPrompt, isIteration: false, projectId, batchCount: total };
+        setHasRetryRequest(true);
+
+        try {
+            if (!projectId) {
+                const localProject = await saveLocalProject({
+                    name: batchPrompt.substring(0, 50),
+                    prompt: batchPrompt,
+                    type: 'content',
+                    status: 'generating',
+                    errorMessage: '',
+                    createdAt: new Date().toISOString()
+                });
+                projectId = localProject.id;
+                setCurrentProjectId(projectId);
+                lastRequestRef.current = { ...lastRequestRef.current, projectId };
+                await loadProjects();
+            }
+
+            setAgentState(AGENT_STATES.GENERATING);
+            const batchResult = await executeAgenticBatch({
+                count: total,
+                prompt: batchPrompt,
+                selectedTextModel,
+                selectedImageModel,
+                visionModel: selectedVisionModel,
+                imageConfig: (agenticMode || ALLOW_IMAGE_CONFIG_WITHOUT_AGENTIC) ? imageConfig : {},
+                settings,
+                sourceImages,
+                projectId,
+                projectName: currentPrompt || batchPrompt,
+                version: versionsSnapshot.length + 1,
+                preferNativeTools: localStorage.getItem(STORAGE_KEYS.TOOL_CALLING_ENABLED) !== 'false',
+                preferOpenRouterImageTool: true,
+                t,
+                signal: requestController.signal,
+                brandContext: batchBrandContext,
+                brandAssetIds: batchBrandAssetIds,
+                hasVisualReference: sourceImages.length > 0,
+                promptForVariation: ({ current, total: variationTotal }) => `${batchPrompt}\n\n${t('workspace.batch.variationInstruction', { current, total: variationTotal })}`,
+                onBeforeVariation: ({ current }) => {
+                    if (requestController.signal.aborted || !gateAction('generate')) return false;
+                    if ((sourceImages.length > 0 || looksLikeVisualRequest(batchPrompt, false)) && !gateAction('image')) return false;
+                    setAgentSteps((steps) => steps.map((step) => step.id === 'batch-progress'
+                        ? { ...step, text: t('workspace.batch.progress', { current, total }), status: 'working' }
+                        : step));
+                    return true;
+                },
+                onProgress: ({ current, total: variationTotal, status }) => {
+                    setBatchProgress({ current, total: variationTotal, status: status === 'completed' ? 'working' : status });
+                },
+                onSteps: (steps, progress) => {
+                    const current = progress?.current || completedCount + 1;
+                    setAgentSteps([
+                        {
+                            id: 'batch-progress',
+                            text: t('workspace.batch.progress', { current, total }),
+                            status: 'working'
+                        },
+                        ...(Array.isArray(steps) ? steps : [])
+                    ]);
+                },
+                onChunk: setDisplayedText,
+                onVariationComplete: async (result, { current }) => {
+                    if (requestController.signal.aborted) throw new Error('REQUEST_ABORTED');
+                    if (result.pendingSaves?.length) {
+                        setPendingArtifactSaves((requests) => {
+                            const next = [...requests];
+                            result.pendingSaves.forEach((request) => {
+                                if (!next.some((item) => item.assetId === request.assetId)) next.push(request);
+                            });
+                            return next;
+                        });
+                    }
+                    const cleanText = String(result.text || batchPrompt).trim();
+                    const newVersion = {
+                        type: 'agentic',
+                        prompt: batchPrompt,
+                        result: cleanText,
+                        model: result.model || selectedTextModel,
+                        imageUrl: result.imageUrl || null,
+                        imageModel: result.imageModel || selectedImageModel,
+                        imagePrompt: result.imagePrompt || '',
+                        imageAssetId: result.images?.at(-1)?.assetId || null,
+                        imageRevisions: result.images || [],
+                        timestamp: new Date().toISOString(),
+                        isNew: true,
+                        batchIndex: current,
+                        batchTotal: total,
+                        agenticSteps: result.plan,
+                        steps: (result.plan || []).map((step, index) => ({
+                            id: `batch-${current}-step-${index}`,
+                            text: step.description || step.prompt,
+                            status: 'done'
+                        }))
+                    };
+                    versionsSnapshot = [...versionsSnapshot, newVersion];
+                    historySnapshot = [
+                        ...historySnapshot,
+                        { role: 'user', content: batchPrompt },
+                        { role: 'assistant', content: cleanText }
+                    ];
+                    completedCount = current;
+                    const newVersionIndex = versionsSnapshot.length - 1;
+                    setVersions(versionsSnapshot);
+                    setCurrentVersionIndex(newVersionIndex);
+                    setHistory(historySnapshot);
+                    incrementUsage('generate', usageUserId);
+                    if (result.images?.length) incrementUsage('image', usageUserId, result.images.length);
+                    refreshDailyUsage();
+                    await saveLocalProject({
+                        id: projectId,
+                        status: 'generating',
+                        errorMessage: '',
+                        result: cleanText,
+                        imageUrl: result.imageUrl || null,
+                        prompt: currentPrompt || batchPrompt,
+                        history: historySnapshot,
+                        versions: versionsSnapshot,
+                        currentVersionIndex: newVersionIndex
+                    });
+                }
+            });
+
+            const stopped = batchResult.stopped || requestController.signal.aborted;
+            setBatchProgress({ current: completedCount, total, status: stopped ? 'cancelled' : 'complete' });
+            setAgentSteps((steps) => [
+                ...steps.filter((step) => step.id !== 'batch-progress'),
+                {
+                    id: 'batch-result',
+                    text: stopped
+                        ? t('workspace.batch.cancelled', { completed: completedCount, total })
+                        : t('workspace.batch.completed', { count: completedCount }),
+                    status: stopped ? 'error' : 'done'
+                }
+            ]);
+            const hasBatchResults = versionsSnapshot.length > 0;
+            setAgentState(hasBatchResults ? AGENT_STATES.COMPLETE : AGENT_STATES.ERROR);
+            setProjectStatus(hasBatchResults ? 'complete' : 'error');
+            if (projectId) {
+                const latest = versionsSnapshot.at(-1);
+                await saveLocalProject({
+                    id: projectId,
+                    status: versionsSnapshot.length > 0 ? 'complete' : 'error',
+                    errorMessage: versionsSnapshot.length > 0 ? '' : stopped ? t('errors.requestAborted') : '',
+                    result: latest?.result || '',
+                    imageUrl: latest?.imageUrl || null,
+                    prompt: currentPrompt || batchPrompt,
+                    history: historySnapshot,
+                    versions: versionsSnapshot,
+                    currentVersionIndex: versionsSnapshot.length - 1
+                });
+                await loadProjects();
+                if (!routeProjectId) navigate(ROUTES.PROJECT.replace(':id', projectId), { replace: true });
+            }
+            trackMetric('batch_complete', {
+                projectId,
+                requested: total,
+                completed: completedCount,
+                cancelled: stopped,
+                model: selectedTextModel,
+                visionModel: selectedVisionModel,
+                imageModel: selectedImageModel
+            });
+        } catch (error) {
+            const aborted = requestController.signal.aborted || error?.message === 'REQUEST_ABORTED';
+            const normalized = aborted ? t('errors.requestAborted') : notifyAIIssue(error.message || 'AI_REQUEST_FAILED');
+            setBatchProgress({ current: completedCount, total, status: aborted ? 'cancelled' : 'error' });
+            setAgentSteps((steps) => [
+                ...steps.map((step) => step.status === 'working' ? { ...step, status: 'error' } : step),
+                {
+                    id: 'batch-error',
+                    text: aborted
+                        ? t('workspace.batch.cancelled', { completed: completedCount, total })
+                        : normalized,
+                    status: 'error'
+                }
+            ]);
+            setErrorMessage(normalized);
+            setAgentState(versionsSnapshot.length > 0 ? AGENT_STATES.COMPLETE : AGENT_STATES.ERROR);
+            setProjectStatus(versionsSnapshot.length > 0 ? 'complete' : 'error');
+            if (projectId) {
+                const latest = versionsSnapshot.at(-1);
+                await saveLocalProject({
+                    id: projectId,
+                    status: versionsSnapshot.length > 0 ? 'complete' : 'error',
+                    errorMessage: versionsSnapshot.length > 0 ? '' : normalized,
+                    result: latest?.result || '',
+                    imageUrl: latest?.imageUrl || null,
+                    prompt: currentPrompt || batchPrompt,
+                    history: historySnapshot,
+                    versions: versionsSnapshot,
+                    currentVersionIndex: versionsSnapshot.length - 1
+                });
+                await loadProjects();
+            }
+        } finally {
+            generationAbortControllerRef.current = null;
+            setIsGenerating(false);
+            setIsIterating(false);
+        }
+    };
+
+    const handleApproveArtifactSave = async (request) => {
+        if (!request?.assetId || isGenerating) return;
+        try {
+            const result = await executeAgentTool('save_image', {
+                assetId: request.assetId,
+                filename: request.filename
+            }, {
+                selectedImageModel,
+                projectId: currentProjectId,
+                projectName: currentPrompt,
+                version: versions.length + 1,
+                settings: getLocalSaveSettings(),
+                approved: true
+            });
+            if (result.status === 'approval-required' || result.status === 'local-writes-blocked') {
+                notifyAIIssue(result.status, t('errors.imageToolError'));
+                return;
+            }
+            setPendingArtifactSaves((requests) => requests.filter((item) => item.assetId !== request.assetId));
+        } catch (error) {
+            notifyAIIssue(error.message || 'IMAGE_SAVE_FAILED', t('errors.imageToolError'));
+        }
+    };
+
+    const dismissArtifactSave = (assetId) => {
+        setPendingArtifactSaves((requests) => requests.filter((item) => item.assetId !== assetId));
     };
 
     // Handle chat iteration
@@ -1160,6 +1667,22 @@ function Workspace() {
         const nextPrompt = chatInput.trim();
         setChatInput('');
         startGeneration(nextPrompt, true);
+    }
+
+    const handleRetryGeneration = () => {
+        const lastRequest = lastRequestRef.current;
+        if (!lastRequest?.prompt || isGenerating) return;
+        setInfoModal((prev) => ({ ...prev, open: false }));
+        setErrorMessage('');
+        startGeneration(lastRequest.prompt, Boolean(lastRequest.isIteration));
+    }
+
+    const handleRetryProjectLoad = () => {
+        setProjectLoadError('');
+        setProjectLoadState('loading');
+        setProjectsLoaded(false);
+        setProjectLoadAttempt((attempt) => attempt + 1);
+        loadProjects();
     };
 
     // Pagination handlers
@@ -1182,16 +1705,21 @@ function Workspace() {
 
     // Handle project delete
     const handleDeleteProject = async (projectId) => {
-        await deleteLocalProjectService(projectId);
-
-        await loadProjects();
-        trackMetric('project_deleted', { projectId });
-        if (currentProjectId === projectId) {
+        const deletingCurrentProject = projectId === currentProjectId;
+        if (deletingCurrentProject) {
+            if (isGenerating) cancelCurrentGeneration(t('errors.requestAborted'));
+            navigate(ROUTES.WORKSPACE, { replace: true });
             setCurrentProjectId(null);
+            setProjectStatus('idle');
             setVersions([]);
             setCurrentVersionIndex(-1);
             setCurrentPrompt('');
+            setHistory([]);
+            setHasRetryRequest(false);
         }
+        await deleteLocalProjectService(projectId);
+        await loadProjects();
+        trackMetric('project_deleted', { projectId });
     };
 
     const handleDownloadImage = async (url) => {
@@ -1306,7 +1834,7 @@ function Workspace() {
             case AGENT_STATES.GENERATING: return t('Agent.generating');
             case AGENT_STATES.COMPLETE: return t('Agent.complete');
             case AGENT_STATES.ERROR: return t('errors.generic');
-            case AGENT_STATES.NOT_CONFIGURED: return 'AI Not Configured';
+            case AGENT_STATES.NOT_CONFIGURED: return t('errors.notConfigured');
             default: return '';
         }
     };
@@ -1327,19 +1855,26 @@ function Workspace() {
 
         try {
             const imagePrompt = `Create an image that visually represents: ${currentVersion.prompt || currentVersion.result?.substring(0, 200)}`;
-            const imgResponse = await generateImage(imagePrompt, selectedImageModel);
+            const imgResponse = await generateImage(imagePrompt, selectedImageModel, {
+                ...((agenticMode || ALLOW_IMAGE_CONFIG_WITHOUT_AGENTIC) ? imageConfig : {})
+            });
 
             if (imgResponse.success) {
+                const generatedArtifact = await saveImageArtifact(imgResponse.imageUrl, {
+                    projectId: currentProjectId,
+                    projectName: currentPrompt,
+                    version: safeIndex + 1,
+                    kind: 'generated',
+                    model: imgResponse.model || selectedImageModel,
+                    prompt: imagePrompt
+                });
                 const updatedVersions = versions.map((v, i) =>
                     i === safeIndex
-                        ? { ...v, imageUrl: imgResponse.imageUrl, imageModel: imgResponse.model, imagePrompt: imagePrompt }
+                        ? { ...v, imageUrl: generatedArtifact.asset.data, imageModel: imgResponse.model, imagePrompt: imagePrompt, imageAssetId: generatedArtifact.asset.id, imageRevisions: [...(v.imageRevisions || []), generatedArtifact.asset] }
                         : v
                 );
                 setVersions(updatedVersions);
                 incrementUsage('image', usageUserId);
-                if (selectedImageModel === 'bytedance-seed/seedream-4.5') {
-                    incrementModelUsage('seedream_edit', usageUserId);
-                }
                 refreshDailyUsage();
                 trackMetric('image_generation_success', {
                     projectId: currentProjectId,
@@ -1359,10 +1894,10 @@ function Workspace() {
                     });
                 }
             } else {
-                notifyAIIssue(imgResponse.error || 'Image generation failed', 'Error de imagen');
+                notifyAIIssue(imgResponse.error || 'IMAGE_GENERATION_FAILED', t('errors.imageToolError'));
             }
         } catch (error) {
-            notifyAIIssue(error.message || 'Image generation failed', 'Error de imagen');
+            notifyAIIssue(error.message || 'IMAGE_GENERATION_FAILED', t('errors.imageToolError'));
         } finally {
             setIsGeneratingImage(false);
         }
@@ -1558,7 +2093,7 @@ function Workspace() {
                                     <div
                                         key={project.id}
                                         className={`project-item ${currentProjectId === project.id ? 'active' : ''}`}
-                                        onClick={() => openProjectInWorkspace(project)}
+                                        onClick={() => handleSelectProject(project)}
                                     >
                                         <Icon src={ICONS.FOLDER} size="sm" />
                                         <span className="project-name">{project.name || 'Untitled'}</span>
@@ -1585,6 +2120,12 @@ function Workspace() {
                 <div className="sidebar-footer">
                     <button className="icon-button" onClick={() => navigate(ROUTES.SETTINGS)} aria-label={t('settings.title')}>
                         <Icon src={ICONS.SETTINGS} size="sm" animation="spin" />
+                    </button>
+                    <button className="icon-button" onClick={() => navigate(ROUTES.GALLERY)} aria-label={t('gallery.title')}>
+                        <Icon src={ICONS.FOLDER} size="sm" />
+                    </button>
+                    <button className="icon-button" onClick={() => navigate(ROUTES.CLI)} aria-label="CLI">
+                        <Icon src={ICONS.CONFIG} size="sm" />
                     </button>
                     <button className="icon-button" onClick={toggleTheme} aria-label={t('settings.theme.title')}>
                         <Icon src={ICONS.FOQUITO} size="sm" animation="pop" />
@@ -1640,6 +2181,71 @@ function Workspace() {
                 </header>
 
                 <div className="workspace-canvas">
+                    <div className="workspace-editor-controls">
+                        <span className="workspace-editor-mode-label">{t('workspace.editorMode')}</span>
+                        <AgenticToggle isActive={agenticMode} onToggle={setAgenticMode} isRunning={isGenerating} />
+                    </div>
+
+                    {(agenticMode || ALLOW_IMAGE_CONFIG_WITHOUT_AGENTIC) && (
+                        <ImageConfigPanel
+                            config={imageConfig}
+                            onChange={setImageConfig}
+                            isVisible={true}
+                        />
+                    )}
+
+                    {pendingArtifactSaves.length > 0 && (
+                        <div className="workspace-pending-saves" role="status" aria-live="polite">
+                            <strong>{t('workspace.pendingSaves.title')}</strong>
+                            {pendingArtifactSaves.map((request) => (
+                                <div className="workspace-pending-save" key={request.assetId}>
+                                    <span>{request.filename}</span>
+                                    <div className="workspace-pending-save-actions">
+                                        <Button variant="primary" onClick={() => handleApproveArtifactSave(request)}>
+                                            {t('workspace.pendingSaves.approve')}
+                                        </Button>
+                                        <Button variant="secondary" onClick={() => dismissArtifactSave(request.assetId)}>
+                                            {t('common.close')}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {routeProjectId && projectLoadState === 'loading' && (
+                        <div className="workspace-route-state workspace-route-state-loading" role="status" aria-live="polite">
+                            <Loader variant="dots" size="sm" />
+                            <span>{t('workspace.projectLoading')}</span>
+                        </div>
+                    )}
+
+                    {routeProjectId && projectLoadState === 'error' && (
+                        <div className="workspace-route-state workspace-route-state-error" role="alert">
+                            <Icon src={ICONS.INFO} size="lg" />
+                            <h3>{t('workspace.projectLoadErrorTitle')}</h3>
+                            <p>{projectLoadError || t('workspace.projectLoadErrorMessage')}</p>
+                            <div className="workspace-route-state-actions">
+                                <Button variant="secondary" onClick={handleRetryProjectLoad}>{t('common.retry')}</Button>
+                                <Button variant="primary" onClick={handleNewPrompt}>{t('workspace.startNewProject')}</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {(!routeProjectId || projectLoadState === 'ready') && projectStatus !== 'error' && versions.length === 0 && currentProjectId && (
+                        <div className="workspace-project-empty-state">
+                            <Icon src={ICONS.EMPTY} size="lg" />
+                            <h3>{projectStatus === 'draft' ? t('workspace.projectDraftTitle') : t('workspace.projectEmptyTitle')}</h3>
+                            <p>{projectStatus === 'draft' ? t('workspace.projectDraftMessage') : t('workspace.projectEmptyMessage')}</p>
+                            {currentPrompt && <div className="workspace-project-prompt">{currentPrompt}</div>}
+                            <div className="workspace-route-state-actions">
+                                <Button variant="primary" onClick={handleRetryGeneration} disabled={!hasRetryRequest}>
+                                    {t('workspace.retryGeneration')}
+                                </Button>
+                                <Button variant="secondary" onClick={handleNewPrompt}>{t('workspace.startNewProject')}</Button>
+                            </div>
+                        </div>
+                    )}
                     {agentState === AGENT_STATES.NOT_CONFIGURED && (
                         <div className="canvas-error animate-fadeInUp">
                             <Icon src={ICONS.INFO} size="xl" />
@@ -1654,13 +2260,27 @@ function Workspace() {
                         <div className="canvas-error animate-fadeInUp">
                             <Icon src={ICONS.INFO} size="xl" />
                             <h3>{t('errors.generic')}</h3>
-                            <p>{errorMessage}</p>
-                            <Button variant="secondary" onClick={handleNewPrompt}>{t('common.retry')}</Button>
+                            <p className="workspace-error-detail">{errorMessage || t('errors.generic')}</p>
+                            <div className="workspace-route-state-actions">
+                                <Button variant="primary" onClick={handleRetryGeneration} disabled={!hasRetryRequest}>
+                                    {t('workspace.retryGeneration')}
+                                </Button>
+                                <Button variant="secondary" onClick={handleNewPrompt}>{t('workspace.startNewProject')}</Button>
+                            </div>
                         </div>
                     )}
 
                     {isWorking && !isIterating && (
                         <div className="canvas-loading">
+                            {batchProgress && (
+                                <div className="batch-progress-summary" role="status" aria-live="polite">
+                                    {batchProgress.status === 'working'
+                                        ? t('workspace.batch.progress', { current: batchProgress.current, total: batchProgress.total })
+                                        : batchProgress.status === 'cancelled'
+                                            ? t('workspace.batch.cancelled', { completed: batchProgress.current, total: batchProgress.total })
+                                            : t('workspace.batch.completed', { count: batchProgress.current })}
+                                </div>
+                            )}
                             <div className="agent-steps-log">
                                 {agentSteps.map(step => (
                                     <div key={step.id} className={`step-item ${step.status}`}>
@@ -1757,7 +2377,7 @@ function Workspace() {
                         </div>
                     )}
 
-                    {agentState === AGENT_STATES.IDLE && versions.length === 0 && (
+                    {agentState === AGENT_STATES.IDLE && versions.length === 0 && !currentProjectId && (
                         <div className="canvas-empty">
                             <Icon src={ICONS.EMPTY} size="xl" />
                             <p>{t('workspace.untitled')}</p>
@@ -1886,7 +2506,6 @@ function Workspace() {
                             </button>
                         </form>
                         <div style={{display:'flex',gap:'6px',marginTop:'4px',justifyContent:'flex-end',alignItems:'center'}}>
-                            <AgenticToggle isActive={agenticMode} onToggle={setAgenticMode} isRunning={isGenerating} />
                             <BatchButton onClick={() => setShowBatchModal(true)} disabled={isGenerating || !chatInput.trim()} />
                             <CalendarToggle onClick={() => setShowCalendar(c => !c)} hasEntries={false} />
                         </div>
@@ -1903,12 +2522,10 @@ function Workspace() {
 
             {/* Batch Mode Modal */}
             <BatchMode
-                open={showBatchModal}
+                isOpen={showBatchModal}
                 onClose={() => setShowBatchModal(false)}
                 prompt={chatInput}
-                onConfirm={(count) => {
-                    setShowBatchModal(false);
-                }}
+                onConfirm={handleBatchConfirm}
             />
 
             <aside className="workspace-toolbar">
@@ -2042,18 +2659,25 @@ function Workspace() {
 
             <Modal
                 isOpen={infoModal.open}
-                onClose={() => setInfoModal({ open: false, title: '', message: '' })}
+                onClose={() => setInfoModal({ open: false, title: '', message: '', canRetry: false })}
                 title={infoModal.title}
                 footer={
-                    <Button
-                        variant="primary"
-                        onClick={() => setInfoModal({ open: false, title: '', message: '' })}
-                    >
-                        {t('common.close')}
-                    </Button>
+                    <div className="workspace-modal-actions">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setInfoModal({ open: false, title: '', message: '', canRetry: false })}
+                        >
+                            {t('common.close')}
+                        </Button>
+                        {infoModal.canRetry && (
+                            <Button variant="primary" onClick={handleRetryGeneration}>
+                                {t('workspace.retryGeneration')}
+                            </Button>
+                        )}
+                    </div>
                 }
             >
-                <p>{infoModal.message}</p>
+                <p className="workspace-error-detail">{infoModal.message}</p>
             </Modal>
 
             <Modal
@@ -2135,17 +2759,15 @@ function Workspace() {
                         value={selectedTextModel}
                         onChange={(e) => setSelectedTextModel(e.target.value)}
                     >
+                        {textModelOptions.length === 0 && <option value="">{t('workspace.model.noModels')}</option>}
                         {textModelOptions.map((model) => (
                             <option key={model.id} value={model.id}>
-                                {getTextModelLabel(model.id)}
+                                {getModelLabel(model.id, textModelOptions)}
                             </option>
                         ))}
                     </select>
-                    {!isPro && selectedTextModel === 'nvidia/nemotron-nano-12b-v2-vl:free' && (
-                        <small>{t('workspace.model.glmHint')}</small>
-                    )}
                     <div className="model-blurb">
-                        {getTextModelBlurb(selectedTextModel)}
+                        {getModelBlurb(selectedTextModel, textModelOptions)}
                     </div>
                 </div>
 
@@ -2156,17 +2778,32 @@ function Workspace() {
                         value={selectedImageModel}
                         onChange={(e) => setSelectedImageModel(e.target.value)}
                     >
+                        {imageModelOptions.length === 0 && <option value="">{t('workspace.model.noModels')}</option>}
                         {imageModelOptions.map((model) => (
                             <option key={model.id} value={model.id}>
-                                {getImageModelLabel(model.id)}
+                                {getModelLabel(model.id, imageModelOptions)}
                             </option>
                         ))}
                     </select>
-                    {!isPro && selectedImageModel === 'bytedance-seed/seedream-4.5' && (
-                        <small>{t('workspace.model.seedreamHint')}</small>
-                    )}
                     <div className="model-blurb">
-                        {getImageModelBlurb(selectedImageModel)}
+                        {getModelBlurb(selectedImageModel, imageModelOptions)}
+                    </div>
+                </div>
+
+                <div className="model-selector-block">
+                    <label htmlFor="workspace-vision-model">{t('workspace.model.visionLabel')}</label>
+                    <select
+                        id="workspace-vision-model"
+                        value={selectedVisionModel || ''}
+                        onChange={(e) => setSelectedVisionModel(e.target.value)}
+                    >
+                        <option value="">{t('workspace.model.noModelSelected')}</option>
+                        {visionModelOptions.map((model) => (
+                            <option key={model.id} value={model.id}>{getModelLabel(model.id, visionModelOptions)}</option>
+                        ))}
+                    </select>
+                    <div className="model-blurb">
+                        {getModelBlurb(selectedVisionModel, visionModelOptions)}
                     </div>
                 </div>
             </Modal>

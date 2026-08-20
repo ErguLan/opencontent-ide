@@ -7,23 +7,26 @@
 
 > Open source AI content creation studio. Self-hosted. BYOK. Ollama-compatible.
 
-**OpenContent IDE** is a self-hosted, open-source content creation IDE powered by AI. Think "Cursor, but for social media content." Generate text, images, and creative assets using your own API keys or local models via Ollama.
+**OpenContent IDE** is a local-first, open-source content creation IDE powered by AI. Generate text, images, and creative assets using your own API keys or local models via Ollama. All data stays in your browser by default.
 
 ---
 
 ## Features
 
-- **BYOK (Bring Your Own Key)** — Use OpenRouter, Gemini, or OpenAI keys. No subscriptions.
+- **BYOK (Bring Your Own Key)** — Use OpenRouter, OpenAI, Google, Anthropic, or Ollama. No bundled subscriptions.
 - **Ollama Support** — Run 100% locally with your own GPU. No API keys needed.
+- **Model Registry** — Built-in models plus custom model IDs with provider and capability tags.
 - **Skills System** — Switchable AI personas (Content Creator, SEO Writer, Copywriter, etc.)
-- **Local-First** — All data stored in your browser (IndexedDB). Nothing leaves your machine.
+- **Local-First** — Projects and media stored in IndexedDB. Settings and keys in localStorage.
 - **Chat Memory** — Persistent conversation history per project.
+- **Media Panel** — Upload, tag, search, preview, and attach assets to prompts.
+- **Mini CLI** — Command palette for quick actions inside the workspace.
 - **Copy as API** — Generate curl/JS/Python snippets from any prompt.
 - **API Server Mode** — REST API with OpenAI-compatible endpoint.
 - **MCP Tool Provider** — Use as an AI tool from Claude, Gemini, etc.
-- **Dark/Light Mode** — Beautiful, minimal UI with theme support.
+- **Dark/Light Mode** — Minimal UI with theme support.
 - **i18n** — English and Spanish out of the box.
-- **Docker Ready** — One-click deploy with Docker Compose.
+- **Docker Ready** — Deploy with Docker Compose.
 - **Export** — Download your projects as JSON or images.
 - **Version History** — Iterate on content with full version tracking.
 
@@ -58,14 +61,13 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Using with Ollama (100% Local)
 
-No API keys required! Just install [Ollama](https://ollama.com), pull a model, and go:
+No API keys required. Install [Ollama](https://ollama.com), pull a model, and set the base URL:
 
 ```bash
-# Install Ollama, then:
 ollama pull llama3
 ```
 
-Set `VITE_OLLAMA_BASE_URL=http://localhost:11434` in your `.env` file. Models without a `/` in the ID (e.g., `llama3`, `mistral`) are automatically routed to Ollama.
+Set `VITE_OLLAMA_BASE_URL=http://localhost:11434` in your `.env` file. Select the Ollama provider in Settings and enter any model ID (e.g., `llama3`, `mistral`).
 
 ---
 
@@ -108,7 +110,9 @@ Use OpenContent IDE as a tool from AI agents:
 }
 ```
 
-**Available MCP Tools:** `generate_content`, `generate_image`, `list_skills`, `list_models`
+**Available MCP Tools:** `generate_content`, `generate_image`, `list_gallery_assets`, `get_gallery_asset`, `clone_gallery_asset`, `save_image`, `list_skills`, `list_models`
+
+Gallery access is controlled. The browser agent can inspect IndexedDB gallery assets, while standalone MCP uses `OC_GALLERY_DIR`. Cloning creates a copy and retains the original gallery file. Local writes require `OC_ALLOW_LOCAL_WRITES=true` and an allowed destination.
 
 ---
 
@@ -117,7 +121,9 @@ Use OpenContent IDE as a tool from AI agents:
 | Provider | Text | Images | Local | Free Tier |
 |----------|------|--------|-------|-----------|
 | **OpenRouter** | Yes | Yes | No | Yes (free models) |
-| **Gemini** | Yes | Yes | No | Yes |
+| **OpenAI** | Yes | Yes | No | Paid |
+| **Google (Gemini)** | Yes | Yes | No | Yes |
+| **Anthropic (Claude)** | Yes | No | No | Paid |
 | **Ollama** | Yes | No | Yes | Yes (your GPU) |
 
 ---
@@ -147,8 +153,11 @@ Add your own skills by editing `src/data/skills.json`.
 │   ├── context/          # React contexts (Auth, Theme, Language)
 │   ├── data/             # Skills/personas JSON
 │   ├── features/         # Pages + decomposed components & hooks
+│   │   └── workspace/
+│   │       ├── hooks/    # useWorkspaceAI, useWorkspaceMedia
+│   │       └── components/ # MediaPanel, CommandPalette, etc.
 │   ├── components/       # Reusable UI components
-│   ├── services/         # AI, chat history, media, metrics, copyAsApi
+│   ├── services/         # AI providers, models, media, metrics
 │   ├── styles/           # CSS variables, animations
 │   ├── i18n/             # Translations (EN/ES)
 │   └── utils/            # Helpers, image processing
@@ -156,10 +165,24 @@ Add your own skills by editing `src/data/skills.json`.
 │   ├── routes/           # REST endpoints
 │   └── lib/              # Shared provider logic
 ├── mcp/                  # MCP Tool Provider (stdio)
+├── scripts/              # Asset generators
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # One-click deployment
 └── .github/workflows/    # CI pipeline
 ```
+
+---
+
+## Generating Assets
+
+Brand assets are generated from a Python script:
+
+```bash
+pip install Pillow
+python scripts/generate-assets.py
+```
+
+This writes PNG sizes and an SVG mark to `public/brand/`.
 
 ---
 
@@ -170,7 +193,9 @@ See [.env.example](.env.example) for all available options.
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `VITE_OPENROUTER_API_KEY` | At least one key | OpenRouter API key |
-| `VITE_GEMINI_API_KEY` | At least one key | Google Gemini API key |
+| `VITE_OPENAI_API_KEY` | At least one key | OpenAI API key |
+| `VITE_GOOGLE_API_KEY` | At least one key | Google Gemini API key |
+| `VITE_ANTHROPIC_API_KEY` | At least one key | Anthropic API key |
 | `VITE_OLLAMA_BASE_URL` | No | Ollama URL (default: localhost:11434) |
 | `VITE_ENABLE_USAGE_LIMITS` | No | Enable freemium limits (for SaaS forks) |
 
@@ -190,8 +215,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap
 
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the current phase and planned work.
+
+Highlights:
+
 - [x] Core content generation (text + images)
 - [x] BYOK multi-provider support
+- [x] Model registry with custom models
 - [x] Skills/Personas system
 - [x] Local-first data storage
 - [x] i18n (EN/ES)
@@ -202,6 +232,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - [x] MCP Tool Provider
 - [x] Chat with persistent memory
 - [x] "Copy as API" button
+- [x] Media Panel and asset management
+- [x] Command Palette (mini CLI)
 - [x] GitHub Actions CI
 - [ ] Streaming responses
 - [ ] Plugin system

@@ -2,15 +2,20 @@
  * useWorkspaceMedia — Media/Templates asset management
  * OpenContent IDE
  */
+
 import { useState, useRef, useCallback } from 'react';
 import {
     getAllMedia,
     saveMedia,
     deleteMedia,
-    getMediaById
+    updateMediaMetadata,
+    countMedia,
+    fileToBase64
 } from '../../../services/mediaService';
 
-export function useWorkspaceMedia(currentProjectId, isPro) {
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+export function useWorkspaceMedia({ isPro, t, onNotify }) {
     const [mediaAssets, setMediaAssets] = useState([]);
     const [activeAssetIds, setActiveAssetIds] = useState([]);
     const [mediaSidebarOpen, setMediaSidebarOpen] = useState(true);
@@ -22,97 +27,113 @@ export function useWorkspaceMedia(currentProjectId, isPro) {
 
     const loadMedia = useCallback(async () => {
         try {
-            const all = await getAllMedia(currentProjectId);
-            setMediaAssets(all || []);
+            const assets = await getAllMedia();
+            const normalized = (assets || []).map((asset) => ({ ...asset, role: asset.role || 'reference' }));
+            setMediaAssets(normalized);
+            setActiveAssetIds((prev) => prev.filter((id) => normalized.some((asset) => asset.id === id)));
         } catch (err) {
             console.error('Failed to load media:', err);
         }
-    }, [currentProjectId]);
+    }, []);
 
-    const handleUploadMedia = useCallback(async (e) => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length) return;
+    const validateFile = useCallback((file) => {
+        if (!file.type.startsWith('image/')) {
+            onNotify?.(t('workspace.media.invalidTypeTitle'), t('workspace.media.invalidTypeMessage'));
+            return false;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            onNotify?.(t('workspace.media.tooLargeTitle'), t('workspace.media.tooLargeMessage', { size: (file.size / (1024 * 1024)).toFixed(1) }));
+            return false;
+        }
+        return true;
+    }, [t, onNotify]);
 
-        if (!isPro && mediaAssets.length + files.length > 3) {
+    const handleUploadMedia = useCallback(async (fileOrEvent) => {
+        const file = fileOrEvent?.target ? fileOrEvent.target.files?.[0] : fileOrEvent;
+        if (!file) return { error: 'NO_FILE' };
+        if (!validateFile(file)) return { error: 'INVALID_FILE' };
+
+        const currentCount = await countMedia();
+        const limit = isPro ? 10 : 3;
+        if (currentCount >= limit) {
+            onNotify?.(
+                t('workspace.media.limitTitle'),
+                isPro ? t('workspace.media.limitPro') : t('workspace.media.limitFree')
+            );
             return { error: 'LIMIT_REACHED' };
         }
 
         setIsUploadingMedia(true);
         try {
-            for (const file of files) {
-                if (!file.type.startsWith('image/')) continue;
-                const reader = new FileReader();
-                const dataUrl = await new Promise((resolve) => {
-                    reader.onload = () => resolve(reader.result);
-                    reader.readAsDataURL(file);
-                });
-
-                const asset = {
-                    name: file.name,
-                    type: file.type,
-                    role: uploadAssetRole,
-                    dataUrl,
-                    projectId: currentProjectId,
-                    createdAt: new Date().toISOString()
-                };
-
-                const saved = await saveMedia(asset);
-                setMediaAssets(prev => [...prev, saved]);
-            }
+            const saved = await saveMedia(file, file.name, { role: uploadAssetRole });
+            setMediaAssets((prev) => [...prev, { ...saved, role: uploadAssetRole }]);
+            return { success: true, asset: saved };
         } catch (err) {
             console.error('Upload failed:', err);
+            onNotify?.(t('workspace.media.uploadFailedTitle'), t('workspace.media.uploadFailedMessage'));
+            return { error: 'UPLOAD_FAILED' };
         } finally {
             setIsUploadingMedia(false);
-            if (e.target) e.target.value = '';
+            if (fileOrEvent?.target) fileOrEvent.target.value = '';
         }
-        return { success: true };
-    }, [currentProjectId, isPro, mediaAssets.length, uploadAssetRole]);
+    }, [isPro, uploadAssetRole, validateFile, t, onNotify]);
 
     const handleDeleteMedia = useCallback(async (id) => {
         try {
             await deleteMedia(id);
-            setMediaAssets(prev => prev.filter(a => a.id !== id));
-            setActiveAssetIds(prev => prev.filter(aid => aid !== id));
+            setMediaAssets((prev) => prev.filter((asset) => asset.id !== id));
+            setActiveAssetIds((prev) => prev.filter((assetId) => assetId !== id));
             if (attachedMedia?.id === id) setAttachedMedia(null);
         } catch (err) {
             console.error('Delete media failed:', err);
+            onNotify?.(t('workspace.media.deleteFailedTitle'), t('workspace.media.deleteFailedMessage'));
         }
-    }, [attachedMedia]);
+    }, [attachedMedia, t, onNotify]);
 
     const toggleAssetActive = useCallback((assetId) => {
-        setActiveAssetIds(prev =>
+        setActiveAssetIds((prev) =>
             prev.includes(assetId)
-                ? prev.filter(id => id !== assetId)
+                ? prev.filter((id) => id !== assetId)
                 : [...prev, assetId]
         );
     }, []);
 
     const handleAssetRoleChange = useCallback(async (assetId, role) => {
-        setMediaAssets(prev => prev.map(a => a.id === assetId ? { ...a, role } : a));
+        try {
+            await updateMediaMetadata(assetId, { role });
+            setMediaAssets((prev) => prev.map((asset) => asset.id === assetId ? { ...asset, role } : asset));
+        } catch (err) {
+            console.error('Asset role update failed:', err);
+        }
     }, []);
 
     const handleAttachMediaFromChat = useCallback(async (e) => {
         const file = e.target.files?.[0];
-        if (!file || !file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        const dataUrl = await new Promise(resolve => {
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(file);
-        });
-        setAttachedMedia({ name: file.name, dataUrl, type: file.type, id: `temp_${Date.now()}` });
+        if (!file) return;
+        if (!validateFile(file)) return;
+        try {
+            const base64 = await fileToBase64(file);
+            setAttachedMedia({ id: `temp_${Date.now()}`, name: file.name, data: base64, role: 'reference' });
+        } catch (err) {
+            console.error('Context attach failed:', err);
+        }
         if (e.target) e.target.value = '';
+    }, [validateFile]);
+
+    const handleAttachExistingAsset = useCallback((asset) => {
+        setAttachedMedia({ id: asset.id, name: asset.name, data: asset.data, role: asset.role || 'reference' });
     }, []);
 
     const isPersistedAssetId = useCallback((id) => {
-        return typeof id === 'string' && !id.startsWith('temp_');
+        return typeof id === 'string' && id.startsWith('asset_');
     }, []);
 
-    const getAssetRoleLabel = useCallback((role) => {
+    const getAssetRoleLabel = useCallback((role, translate) => {
         const map = {
-            template: 'Template',
-            reference: 'Reference',
-            logo: 'Logo',
-            overlay: 'Overlay'
+            template: translate('workspace.media.roleTemplate'),
+            reference: translate('workspace.media.roleReference'),
+            logo: translate('workspace.media.roleLogo'),
+            overlay: translate('workspace.media.roleOverlay')
         };
         return map[role] || role;
     }, []);
@@ -136,6 +157,7 @@ export function useWorkspaceMedia(currentProjectId, isPro) {
         toggleAssetActive,
         handleAssetRoleChange,
         handleAttachMediaFromChat,
+        handleAttachExistingAsset,
         isPersistedAssetId,
         getAssetRoleLabel
     };

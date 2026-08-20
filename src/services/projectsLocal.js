@@ -114,6 +114,21 @@ export const getLocalProjects = async () => {
     });
 };
 
+export const getLocalProject = async (projectId) => {
+    if (!projectId) return null;
+
+    return withDb((db) => {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction([STORE_NAME], 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.get(projectId);
+
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    });
+};
+
 export const saveLocalProject = async (project) => {
     if (!project) return null;
 
@@ -122,22 +137,25 @@ export const saveLocalProject = async (project) => {
             const tx = db.transaction([STORE_NAME], 'readwrite');
             const store = tx.objectStore(STORE_NAME);
             const projectId = project.id || `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            let savedProject = null;
+
+            tx.oncomplete = () => resolve(savedProject);
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error('PROJECT_SAVE_ABORTED'));
 
             const getReq = store.get(projectId);
             getReq.onerror = () => reject(getReq.error);
             getReq.onsuccess = () => {
                 const existing = getReq.result;
-                const nowIso = new Date().toISOString();
-                const newProject = {
+                savedProject = {
                     ...(existing || {}),
                     ...project,
                     id: projectId,
-                    createdAt: existing?.createdAt || project.createdAt || nowIso,
-                    updatedAt: nowIso
+                    createdAt: existing?.createdAt || project.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
                 };
 
-                const putReq = store.put(newProject);
-                putReq.onsuccess = () => resolve(newProject);
+                const putReq = store.put(savedProject);
                 putReq.onerror = () => reject(putReq.error);
             };
         });
@@ -152,7 +170,9 @@ export const deleteLocalProject = async (projectId) => {
             const tx = db.transaction([STORE_NAME], 'readwrite');
             const store = tx.objectStore(STORE_NAME);
             const req = store.delete(projectId);
-            req.onsuccess = () => resolve(true);
+            tx.oncomplete = () => resolve(true);
+            tx.onabort = () => reject(tx.error || new Error('PROJECT_DELETE_ABORTED'));
+            tx.onerror = () => reject(tx.error);
             req.onerror = () => reject(req.error);
         });
     });

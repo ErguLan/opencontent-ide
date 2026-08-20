@@ -6,9 +6,12 @@
 // App info
 export const APP_NAME = import.meta.env.VITE_APP_NAME || 'OpenContent IDE';
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.0';
+export const REPO_URL = 'https://github.com/ErguLan/opencontent-ide';
 
 // Feature flags
 export const ENABLE_USAGE_LIMITS = import.meta.env.VITE_ENABLE_USAGE_LIMITS === 'true';
+export const CLI_ENABLED = import.meta.env.VITE_CLI_ENABLED !== 'false';
+export const CLI_ACCESS = import.meta.env.VITE_CLI_ACCESS || 'public'; // 'public' | 'local_only' | 'disabled'
 
 // Routes
 export const ROUTES = {
@@ -16,7 +19,9 @@ export const ROUTES = {
     WORKSPACE: '/workspace',
     SETTINGS: '/settings',
     LOGIN: '/login',
-    PROJECT: '/project/:id'
+    PROJECT: '/project/:id',
+    CLI: '/cli',
+    GALLERY: '/gallery'
 };
 
 // Local storage keys
@@ -28,6 +33,7 @@ export const STORAGE_KEYS = {
     LAST_PROJECT: 'oc_last_project',
     PENDING_PROMPT: 'oc_pending_prompt',
     SELECTED_TEXT_MODEL: 'oc_selected_text_model',
+    SELECTED_VISION_MODEL: 'oc_selected_vision_model',
     SELECTED_IMAGE_MODEL: 'oc_selected_image_model',
     SHOW_LAST_PROMPT: 'oc_show_last_prompt',
     IMAGE_PROCESSING_MODE: 'oc_image_processing_mode',
@@ -36,7 +42,14 @@ export const STORAGE_KEYS = {
     ACTIVE_SKILL: 'oc_active_skill',
     CUSTOM_TEXT_MODEL: 'oc_custom_text_model',
     CUSTOM_IMAGE_MODEL: 'oc_custom_image_model',
-    OLLAMA_URL: 'oc_ollama_url'
+    OLLAMA_URL: 'oc_ollama_url',
+    MODELS: 'oc_models',
+    CLI_ACCESS: 'oc_cli_access',
+    STREAMING_ENABLED: 'oc_streaming_enabled',
+    TOOL_CALLING_ENABLED: 'oc_tool_calling_enabled',
+    LOCAL_SAVE_SETTINGS: 'oc_local_save_settings',
+    IMAGE_ARTIFACTS: 'oc_image_artifacts',
+    BRAND_KIT: 'oc_brand_kit'
 };
 
 // Theme values
@@ -88,9 +101,13 @@ export const AGENT_CONFIG = {
 
 // Asset paths
 export const ASSETS = {
-    LOGO: '/icons/logo.svg',
+    LOGO: '/brand/logo.svg',
     ICONS_DIR: '/icons'
 };
+
+// Safety bypass: set to true to allow Image Config Panel outside agentic mode
+// WARNING: This bypasses the agentic-only restriction
+export const ALLOW_IMAGE_CONFIG_WITHOUT_AGENTIC = false;
 
 // Animation durations (sync with CSS)
 export const ANIMATION = {

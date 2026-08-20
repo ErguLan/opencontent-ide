@@ -7,24 +7,26 @@
  */
 
 import { useState } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import Modal from '../../../components/common/Modal';
 import Button from '../../../components/common/Button';
 
-function BatchMode({ open, onClose, onConfirm, prompt }) {
+function BatchMode({ isOpen, onClose, onConfirm, prompt }) {
+    const { t } = useLanguage();
     const [count, setCount] = useState(5);
 
-    if (!open) return null;
+    if (!isOpen) return null;
 
     return (
-        <Modal open={open} onClose={onClose} title="Batch Generate">
+        <Modal isOpen={isOpen} onClose={onClose} title={t('workspace.batch.title')}>
             <div style={{ marginBottom: '16px' }}>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '12px' }}>
-                    Generate multiple variations of your prompt at once. Each variation uses slightly different parameters for diverse results.
+                    {t('workspace.batch.description')}
                 </p>
 
                 <div style={{ marginBottom: '12px' }}>
                     <label style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                        Current prompt:
+                        {t('workspace.batch.currentPrompt')}
                     </label>
                     <div style={{
                         background: 'var(--bg-tertiary, #1a1a1a)',
@@ -35,13 +37,13 @@ function BatchMode({ open, onClose, onConfirm, prompt }) {
                         maxHeight: '80px',
                         overflow: 'auto'
                     }}>
-                        {prompt || 'No prompt entered yet'}
+                        {prompt || t('workspace.batch.noPrompt')}
                     </div>
                 </div>
 
                 <div style={{ marginBottom: '12px' }}>
                     <label style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                        Number of variations: {count}
+                        {t('workspace.batch.variationsCount')} {count}
                     </label>
                     <input
                         type="range"
@@ -65,13 +67,13 @@ function BatchMode({ open, onClose, onConfirm, prompt }) {
                     color: 'var(--text-tertiary)',
                     textAlign: 'center'
                 }}>
-                    This will use ~{count}x your normal token usage
+                    {t('workspace.batch.tokenUsage', { count })}
                 </div>
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
                 <Button variant="secondary" onClick={onClose} style={{ flex: 1 }}>
-                    Cancel
+                    {t('common.cancel')}
                 </Button>
                 <Button
                     variant="primary"
@@ -79,7 +81,7 @@ function BatchMode({ open, onClose, onConfirm, prompt }) {
                     disabled={!prompt?.trim()}
                     style={{ flex: 1 }}
                 >
-                    Generate {count} variations
+                    {t('workspace.batch.generate', { count })}
                 </Button>
             </div>
         </Modal>
@@ -90,13 +92,14 @@ function BatchMode({ open, onClose, onConfirm, prompt }) {
  * BatchButton — Trigger button for batch mode
  */
 export function BatchButton({ onClick, disabled }) {
+    const { t } = useLanguage();
     return (
         <button
             type="button"
             className="batch-mode-btn"
             onClick={onClick}
             disabled={disabled}
-            title="Batch Generate — Create multiple variations"
+            title={t('workspace.batch.title')}
             style={{
                 background: 'var(--bg-secondary, #2a2a2a)',
                 border: '1px solid var(--border-color, #333)',
@@ -113,7 +116,7 @@ export function BatchButton({ onClick, disabled }) {
                 transition: 'all 0.2s ease'
             }}
         >
-            ⚡ Batch
+            {t('workspace.batch.title')}
         </button>
     );
 }

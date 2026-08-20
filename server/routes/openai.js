@@ -13,7 +13,19 @@ import { sendToProvider } from '../lib/providers.js';
 export const openaiRoute = Router();
 
 openaiRoute.post('/chat/completions', async (req, res) => {
-    const { model, messages, temperature, max_tokens, stream } = req.body;
+    const {
+        model,
+        provider,
+        baseUrl,
+        messages,
+        temperature,
+        max_tokens,
+        stream,
+        tools,
+        tool_choice,
+        parallel_tool_calls,
+        response_format
+    } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
         return res.status(400).json({ error: { message: 'messages array is required', type: 'invalid_request_error' } });
@@ -25,21 +37,24 @@ openaiRoute.post('/chat/completions', async (req, res) => {
     const prompt = userMessages[userMessages.length - 1]?.content || '';
     const systemPrompt = systemMessages[0]?.content || undefined;
 
-    if (stream) {
-        return res.status(400).json({ error: { message: 'Streaming not yet supported', type: 'invalid_request_error' } });
-    }
-
     try {
         const result = await sendToProvider({
             prompt,
-            model: model || 'nvidia/nemotron-nano-12b-v2-vl:free',
+            model,
+            provider,
+            baseUrl,
+            messages,
             systemPrompt,
             temperature: temperature || 0.7,
-            max_tokens: max_tokens || 1024
+            max_tokens: max_tokens || 1024,
+            tools,
+            toolChoice: tool_choice,
+            parallelToolCalls: parallel_tool_calls,
+            responseFormat: response_format
         });
 
-        // Return in OpenAI format
-        res.json({
+        const toolCalls = result.toolCalls || [];
+        const completion = {
             id: `chatcmpl-${Date.now()}`,
             object: 'chat.completion',
             created: Math.floor(Date.now() / 1000),
@@ -48,12 +63,39 @@ openaiRoute.post('/chat/completions', async (req, res) => {
                 index: 0,
                 message: {
                     role: 'assistant',
-                    content: result.content || ''
+                    content: result.content || null,
+                    ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {})
                 },
-                finish_reason: 'stop'
+                finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop'
             }],
             usage: result.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-        });
+        };
+
+        if (stream) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders?.();
+            const choice = completion.choices[0];
+            res.write(`data: ${JSON.stringify({
+                id: completion.id,
+                object: 'chat.completion.chunk',
+                created: completion.created,
+                model: completion.model,
+                choices: [{ index: 0, delta: { role: 'assistant', content: choice.message.content }, finish_reason: null }]
+            })}\n\n`);
+            res.write(`data: ${JSON.stringify({
+                id: completion.id,
+                object: 'chat.completion.chunk',
+                created: completion.created,
+                model: completion.model,
+                choices: [{ index: 0, delta: {}, finish_reason: choice.finish_reason }]
+            })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            return res.end();
+        }
+
+        return res.json(completion);
     } catch (err) {
         res.status(500).json({ error: { message: err.message, type: 'server_error' } });
     }

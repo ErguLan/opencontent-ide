@@ -11,7 +11,7 @@ import {
     deleteProjectLocal
 } from '../../../services/projectsLocal';
 
-export function useWorkspaceProjects(usageUserId) {
+export function useWorkspaceProjects() {
     const [projects, setProjects] = useState([]);
     const [projectsLoaded, setProjectsLoaded] = useState(false);
     const [currentProjectId, setCurrentProjectId] = useState(null);

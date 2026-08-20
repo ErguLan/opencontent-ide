@@ -6,6 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import './Modal.css';
+import { useLanguage } from '../../context/LanguageContext';
 import Icon, { ICONS } from '../icons/Icon';
 
 /**
@@ -33,6 +34,7 @@ function Modal({
     footer,
     className = ''
 }) {
+    const { t } = useLanguage();
     const modalRef = useRef(null);
 
     // Close on Escape key
@@ -96,9 +98,9 @@ function Modal({
                             <button
                                 className="modal-close"
                                 onClick={onClose}
-                                aria-label="Close modal"
+                                aria-label={t('common.closeModal')}
                             >
-                                <Icon src={ICONS.CLOSE} size="sm" alt="Close" />
+                                <Icon src={ICONS.CLOSE} size="sm" alt={t('common.close')} />
                             </button>
                         )}
                     </div>

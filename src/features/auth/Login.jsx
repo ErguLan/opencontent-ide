@@ -1,8 +1,9 @@
 /**
  * Login Page
  * OpenContent IDE
- * 
- * With improved error handling, fallback support, and starfield background
+ *
+ * Local-first login by default. Real OAuth/email auth is optional and must
+ * be adapted by forks. This page explains that clearly.
  */
 
 import { useState, useEffect } from 'react';
@@ -17,119 +18,92 @@ import Loader from '../../components/common/Loader';
 import Starfield from '../../components/effects/Starfield';
 import { ROUTES, STORAGE_KEYS } from '../../config/constants';
 
-// External URL for account creation
-const CREATE_ACCOUNT_URL = 'https://www.opencontent.ide/#settings?section=profile';
+const REPO_URL = 'https://github.com/ErguLan/opencontent-ide';
 
 function Login() {
     const navigate = useNavigate();
     const { t } = useLanguage();
-    const { loginGoogle, loginEmail, loading, error, clearError, isAuthenticated } = useAuth();
+    const { loginLocal, loginGoogle, loginEmail, loading, error, clearError, isAuthenticated } = useAuth();
 
+    const [displayName, setDisplayName] = useState('');
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [isEmailLogin, setIsEmailLogin] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [localError, setLocalError] = useState('');
 
-    // Redirect if already authenticated
     useEffect(() => {
         if (isAuthenticated) {
-            navigate(ROUTES.LANDING);
+            const pendingPrompt = localStorage.getItem(STORAGE_KEYS.PENDING_PROMPT);
+            if (pendingPrompt) {
+                localStorage.removeItem(STORAGE_KEYS.PENDING_PROMPT);
+                navigate(ROUTES.WORKSPACE, { state: { initialPrompt: pendingPrompt } });
+            } else {
+                navigate(ROUTES.LANDING);
+            }
         }
     }, [isAuthenticated, navigate]);
 
-    // Clear errors when switching login method
     useEffect(() => {
         clearError();
         setLocalError('');
-    }, [isEmailLogin]);
+    }, [showAdvanced, clearError]);
 
-    const handleAuthSuccess = () => {
-        const pendingPrompt = localStorage.getItem(STORAGE_KEYS.PENDING_PROMPT);
-        if (pendingPrompt) {
-            localStorage.removeItem(STORAGE_KEYS.PENDING_PROMPT);
-            navigate(ROUTES.WORKSPACE, { state: { initialPrompt: pendingPrompt } });
-        } else {
-            navigate(ROUTES.LANDING);
+    const handleLocalLogin = async (e) => {
+        e.preventDefault();
+        setLocalError('');
+        if (!displayName.trim()) {
+            setLocalError(t('auth.nameRequired'));
+            return;
+        }
+        const result = loginLocal({ displayName, email });
+        if (result.success) {
+            const pendingPrompt = localStorage.getItem(STORAGE_KEYS.PENDING_PROMPT);
+            if (pendingPrompt) {
+                localStorage.removeItem(STORAGE_KEYS.PENDING_PROMPT);
+                navigate(ROUTES.WORKSPACE, { state: { initialPrompt: pendingPrompt } });
+            } else {
+                navigate(ROUTES.LANDING);
+            }
         }
     };
 
     const handleGoogleLogin = async () => {
         setLocalError('');
-
-        try {
-            const result = await loginGoogle();
-
-            // If redirect was triggered, don't navigate
-            if (result.redirect) {
-                return;
-            }
-
-            if (result.success) {
-                handleAuthSuccess();
-            } else if (result.error) {
-                setLocalError(result.error);
-            }
-        } catch (err) {
-            setLocalError('Login failed. Please try again.');
-        }
+        const result = await loginGoogle();
+        if (result.error) setLocalError(result.error);
     };
 
     const handleEmailLogin = async (e) => {
         e.preventDefault();
         setLocalError('');
-
-        if (!email) {
-            setLocalError('Please enter your email');
+        if (!email.trim()) {
+            setLocalError(t('auth.emailRequired'));
             return;
         }
-
-        if (!password) {
-            setLocalError('Please enter your password');
-            return;
-        }
-
-        try {
-            const result = await loginEmail(email, password);
-
-            if (result.success) {
-                handleAuthSuccess();
-            } else if (result.error) {
-                setLocalError(result.error);
-            }
-        } catch (err) {
-            setLocalError('Login failed. Please try again.');
-        }
-    };
-
-    const handleCreateAccount = () => {
-        window.open(CREATE_ACCOUNT_URL, '_blank');
+        const result = await loginEmail(email, 'password');
+        if (result.error) setLocalError(result.error);
     };
 
     const displayError = localError || error;
 
     return (
         <div className="login-page">
-            {/* Starfield background */}
             <Starfield starCount={150} />
 
-            {/* Back button */}
             <header className="login-header">
-                <button className="back-button" onClick={() => navigate(ROUTES.LANDING)}>
+                <button className="back-button" onClick={() => navigate(ROUTES.LANDING)} aria-label={t('common.back')}>
                     <Icon src={ICONS.CLOSE} size="sm" />
                 </button>
             </header>
 
-            {/* Login card */}
             <main className="login-main">
                 <div className="login-card animate-fadeInUp">
-                    {/* Logo */}
                     <div className="login-logo">
                         <Icon src={ICONS.LOGO} size={64} alt="OpenContent IDE" />
                     </div>
 
-                    <h1 className="login-title">{t('auth.welcomeBack')}</h1>
+                    <h1 className="login-title">{t('auth.welcome')}</h1>
+                    <p className="login-subtitle">{t('auth.localFirstSubtitle')}</p>
 
-                    {/* Error message */}
                     {displayError && (
                         <div className="login-error" onClick={() => { clearError(); setLocalError(''); }}>
                             <Icon src={ICONS.INFO} size="xs" />
@@ -138,98 +112,87 @@ function Login() {
                         </div>
                     )}
 
-                    {/* Loading state */}
                     {loading && (
                         <div className="login-loading">
                             <Loader variant="spinner" size="md" />
-                            <span>Authenticating...</span>
+                            <span>{t('common.loading')}</span>
                         </div>
                     )}
 
                     {!loading && (
                         <>
-                            {/* Google login */}
-                            {!isEmailLogin && (
-                                <div className="login-methods">
-                                    <Button
-                                        variant="secondary"
-                                        fullWidth
-                                        onClick={handleGoogleLogin}
-                                    >
+                            <form className="login-form" onSubmit={handleLocalLogin}>
+                                <Input
+                                    type="text"
+                                    placeholder={t('auth.displayName')}
+                                    value={displayName}
+                                    onChange={(e) => setDisplayName(e.target.value)}
+                                    fullWidth
+                                    autoFocus
+                                />
+                                <Input
+                                    type="email"
+                                    placeholder={t('auth.emailOptional')}
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    fullWidth
+                                />
+                                <Button type="submit" variant="primary" fullWidth disabled={!displayName.trim()}>
+                                    {t('auth.continueLocal')}
+                                </Button>
+                            </form>
+
+                            <div className="login-divider">
+                                <span>{t('common.or')}</span>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="login-advanced-toggle"
+                                onClick={() => setShowAdvanced((prev) => !prev)}
+                            >
+                                {showAdvanced ? t('auth.hideAdvanced') : t('auth.showAdvanced')}
+                            </button>
+
+                            {showAdvanced && (
+                                <div className="login-advanced">
+                                    <p className="login-advanced-note">{t('auth.advancedNote')}</p>
+                                    <Button variant="secondary" fullWidth onClick={handleGoogleLogin}>
                                         {t('auth.loginWith')} {t('auth.google')}
                                     </Button>
-
-                                    <div className="login-divider">
-                                        <span>o</span>
-                                    </div>
-
-                                    <Button
-                                        variant="ghost"
-                                        fullWidth
-                                        onClick={() => setIsEmailLogin(true)}
+                                    <form className="login-form" onSubmit={handleEmailLogin}>
+                                        <Input
+                                            type="email"
+                                            placeholder={t('auth.email')}
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            fullWidth
+                                        />
+                                        <Input
+                                            type="password"
+                                            placeholder={t('auth.password')}
+                                            value=""
+                                            disabled
+                                            fullWidth
+                                        />
+                                        <Button type="submit" variant="secondary" fullWidth disabled={!email.trim()}>
+                                            {t('auth.loginWith')} {t('auth.email')}
+                                        </Button>
+                                    </form>
+                                    <a
+                                        className="login-repo-link"
+                                        href={REPO_URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                     >
-                                        {t('auth.loginWith')} {t('auth.email')}
-                                    </Button>
+                                        {t('auth.forkDocs')}
+                                    </a>
                                 </div>
                             )}
 
-                            {/* Email login form */}
-                            {isEmailLogin && (
-                                <form className="login-form" onSubmit={handleEmailLogin}>
-                                    <Input
-                                        type="email"
-                                        placeholder={t('auth.email')}
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        fullWidth
-                                        autoFocus
-                                    />
-
-                                    <Input
-                                        type="password"
-                                        placeholder={t('auth.password')}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        fullWidth
-                                    />
-
-                                    <Button
-                                        type="submit"
-                                        variant="primary"
-                                        fullWidth
-                                        disabled={!email || !password}
-                                    >
-                                        {t('auth.login')}
-                                    </Button>
-
-                                    <button
-                                        type="button"
-                                        className="login-back-link"
-                                        onClick={() => setIsEmailLogin(false)}
-                                    >
-                                        {t('common.back')}
-                                    </button>
-                                </form>
-                            )}
-
-                            {/* Create Account Link */}
-                            <div className="login-create-account">
-                                <span>{t('auth.noAccount')}</span>
-                                <button
-                                    type="button"
-                                    className="create-account-link"
-                                    onClick={handleCreateAccount}
-                                >
-                                    {t('auth.createAccount')}
-                                </button>
-                            </div>
+                            <p className="login-security-note">{t('auth.localSecurityNote')}</p>
                         </>
                     )}
-
-                    {/* Security note */}
-                    <p className="login-security-note">
-                        Secure login via Firebase Authentication
-                    </p>
                 </div>
             </main>
         </div>

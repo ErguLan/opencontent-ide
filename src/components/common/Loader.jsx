@@ -4,6 +4,7 @@
  */
 
 import './Loader.css';
+import { useLanguage } from '../../context/LanguageContext';
 import Icon, { ICONS } from '../icons/Icon';
 
 /**
@@ -21,6 +22,7 @@ function Loader({
     fullScreen = false,
     className = ''
 }) {
+    const { t } = useLanguage();
     const sizeMap = {
         sm: 24,
         md: 40,
@@ -51,7 +53,7 @@ function Loader({
                     <Icon
                         src={ICONS.LOGO}
                         size={pixelSize}
-                        alt="Agent"
+                        alt={t('workspace.accessibility.agentLoading')}
                         className="Agent-icon Agent-thinking"
                     />
                     <div className="Agent-rings">
