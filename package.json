@@ -4,14 +4,7 @@
   "version": "0.1.0",
   "description": "Open source AI content creation IDE. Self-hosted, BYOK, Ollama-compatible.",
   "type": "module",
-  "keywords": [
-    "ai",
-    "content-creation",
-    "open-source",
-    "self-hosted",
-    "byok",
-    "ollama"
-  ],
+  "keywords": ["ai", "content-creation", "open-source", "self-hosted", "byok", "ollama"],
   "license": "MIT",
   "scripts": {
     "dev": "vite",
@@ -22,7 +15,11 @@
     "test:watch": "vitest",
     "server:install": "cd server && npm install",
     "server:start": "cd server && node index.js",
-    "mcp:start": "node mcp/index.js"
+    "mcp:start": "node mcp/index.js",
+    "mcp:artifacts": "node mcp/artifacts.js",
+    "cli:artifacts": "node cli/artifacts.js",
+    "rust:check": "cd rust/oc-core && cargo check",
+    "rust:test": "cd rust/oc-core && cargo test"
   },
   "dependencies": {
     "react": "^19.2.0",
