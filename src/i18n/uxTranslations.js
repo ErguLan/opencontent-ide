@@ -14,32 +14,24 @@ export default {
       }
     },
     ux: {
-      saved: 'Saved',
-      saving: 'Saving…',
-      saveFailed: 'Could not save',
+      saved: 'Saved', saving: 'Saving…', saveFailed: 'Could not save',
       deleteConfirm: 'Delete this item? This action cannot be undone.',
-      deleted: '{name} removed',
-      undo: 'Undo',
+      deleted: '{name} removed', undo: 'Undo',
       composerHint: 'Enter to send · Shift+Enter for a new line',
       pdfOriginalProtected: 'Original protected',
       pdfNotesNotEmbedded: 'OpenContent annotations are stored separately and are not embedded in the original PDF yet.',
       downloadOriginal: 'Download original',
-      aiProposes: 'AI proposes {count} changes',
-      selectedContext: 'Editing: {context}',
-      changeAdd: 'Add {label}',
-      changeUpdate: 'Update {label}',
-      changeConnect: 'Connect {from} → {to}',
-      changeLayout: 'Re-layout diagram',
-      changeAnnotation: 'Add PDF annotation',
-      changeDocument: 'Replace document text',
-      changePage: 'Change document pages',
-      changeMetadata: 'Update metadata',
-      changeGeneric: 'Apply {action}'
+      aiProposes: 'AI proposes {count} changes', selectedContext: 'Editing: {context}',
+      search: 'Search…', all: 'All', technicalDetails: 'Technical details', pageLabel: 'Page {number}',
+      changeAdd: 'Add {label}', changeUpdate: 'Update {label}', changeConnect: 'Connect {from} → {to}',
+      changeLayout: 'Re-layout diagram', changeAnnotation: 'Add PDF annotation', changeDocument: 'Replace document text',
+      changePage: 'Change document pages', changeMetadata: 'Update metadata', changeGeneric: 'Apply {action}'
     },
     cliUx: {
-      doctor: 'Check API, model and provider connectivity',
-      status: 'Show the current CLI context',
-      suggestions: 'Suggestions'
+      doctor: 'Check API, model and provider connectivity', status: 'Show the current CLI context', suggestions: 'Suggestions',
+      text: 'text', vision: 'vision', image: 'image', none: 'none',
+      completeHint: 'Tab complete · Esc dismiss', commandFailed: 'Command failed.', commandComplete: 'Command complete.',
+      category: { general:'General', navigation:'Navigation', create:'Create', appearance:'Appearance', config:'Configuration', content:'Content', assets:'Assets', projects:'Projects', artifacts:'Artifacts' }
     }
   },
   es: {
@@ -57,32 +49,24 @@ export default {
       }
     },
     ux: {
-      saved: 'Guardado',
-      saving: 'Guardando…',
-      saveFailed: 'No se pudo guardar',
+      saved: 'Guardado', saving: 'Guardando…', saveFailed: 'No se pudo guardar',
       deleteConfirm: '¿Eliminar este elemento? Esta acción no se puede deshacer.',
-      deleted: '{name} eliminado',
-      undo: 'Deshacer',
+      deleted: '{name} eliminado', undo: 'Deshacer',
       composerHint: 'Enter para enviar · Shift+Enter para una nueva línea',
       pdfOriginalProtected: 'Original protegido',
       pdfNotesNotEmbedded: 'Las anotaciones de OpenContent se guardan por separado y todavía no se incrustan en el PDF original.',
       downloadOriginal: 'Descargar original',
-      aiProposes: 'La IA propone {count} cambios',
-      selectedContext: 'Editando: {context}',
-      changeAdd: 'Agregar {label}',
-      changeUpdate: 'Actualizar {label}',
-      changeConnect: 'Conectar {from} → {to}',
-      changeLayout: 'Reorganizar diagrama',
-      changeAnnotation: 'Agregar anotación al PDF',
-      changeDocument: 'Reemplazar texto del documento',
-      changePage: 'Cambiar páginas del documento',
-      changeMetadata: 'Actualizar metadatos',
-      changeGeneric: 'Aplicar {action}'
+      aiProposes: 'La IA propone {count} cambios', selectedContext: 'Editando: {context}',
+      search: 'Buscar…', all: 'Todos', technicalDetails: 'Detalles técnicos', pageLabel: 'Página {number}',
+      changeAdd: 'Agregar {label}', changeUpdate: 'Actualizar {label}', changeConnect: 'Conectar {from} → {to}',
+      changeLayout: 'Reorganizar diagrama', changeAnnotation: 'Agregar anotación al PDF', changeDocument: 'Reemplazar texto del documento',
+      changePage: 'Cambiar páginas del documento', changeMetadata: 'Actualizar metadatos', changeGeneric: 'Aplicar {action}'
     },
     cliUx: {
-      doctor: 'Comprueba API, modelo y conectividad del proveedor',
-      status: 'Muestra el contexto actual de la CLI',
-      suggestions: 'Sugerencias'
+      doctor: 'Comprueba API, modelo y conectividad del proveedor', status: 'Muestra el contexto actual de la CLI', suggestions: 'Sugerencias',
+      text: 'texto', vision: 'visión', image: 'imagen', none: 'ninguno',
+      completeHint: 'Tab completa · Esc cierra', commandFailed: 'El comando falló.', commandComplete: 'Comando completado.',
+      category: { general:'General', navigation:'Navegación', create:'Crear', appearance:'Apariencia', config:'Configuración', content:'Contenido', assets:'Recursos', projects:'Proyectos', artifacts:'Artefactos' }
     }
   }
 };
