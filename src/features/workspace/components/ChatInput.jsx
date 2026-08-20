@@ -16,18 +16,27 @@ function ChatInput({
     getTextModelLabel, getAssetRoleLabel,
     onAbort, t
 }) {
+    const ensureModel = () => {
+        if (selectedTextModel) return true;
+        onShowModelModal?.();
+        return false;
+    };
+
     const submit = (event) => {
         event.preventDefault();
+        if (!ensureModel()) return;
         onSubmit(event);
     };
 
     const handleComposerKeyDown = (event) => {
         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) {
             event.preventDefault();
-            if (!isWorking || isGenerating) {
-                if (isGenerating) onAbort?.();
-                else onSubmit(event);
+            if (isGenerating) {
+                onAbort?.();
+                return;
             }
+            if (isWorking || !ensureModel()) return;
+            onSubmit(event);
         }
     };
 
@@ -37,6 +46,8 @@ function ChatInput({
         element.style.height = 'auto';
         element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
     };
+
+    const modelLabel = selectedTextModel ? getTextModelLabel(selectedTextModel) : t('workspace.model.noModelSelected');
 
     return (
         <div className="workspace-chat-container">
@@ -51,8 +62,8 @@ function ChatInput({
                         {t('workspace.taskMode.fromScratch')}
                     </button>
                 </div>
-                <button type="button" className="chat-model-btn" onClick={onShowModelModal} title={`Text: ${getTextModelLabel(selectedTextModel)}`}>
-                    {getTextModelLabel(selectedTextModel)}
+                <button type="button" className={`chat-model-btn ${selectedTextModel ? '' : 'needs-selection'}`} onClick={onShowModelModal} title={modelLabel}>
+                    {modelLabel}
                 </button>
                 {!isPro && <button type="button" className="chat-pro-cta-mini" onClick={onShowProModal}>PRO</button>}
             </div>
@@ -60,7 +71,7 @@ function ChatInput({
             {attachedMedia && (
                 <div className="chat-attachment-preview animate-fadeInUp">
                     <img src={attachedMedia.dataUrl || attachedMedia.data} alt={attachedMedia.name} />
-                    <button className="remove-attach" onClick={onRemoveAttach} aria-label={t('common.remove')}><Icon src={ICONS.CLOSE} size="xs" /></button>
+                    <button className="remove-attach" onClick={onRemoveAttach} aria-label={t('common.remove')}><Icon src={ICONS.CLOSE} size="xs" alt="" /></button>
                 </div>
             )}
 
@@ -76,7 +87,7 @@ function ChatInput({
 
             <form className={`chat-input-wrapper ${isWorking && isIterating ? 'form-loading' : ''}`} onSubmit={submit}>
                 <button type="button" className="chat-import-btn" onClick={() => chatFileInputRef.current?.click()} aria-label={t('workspace.media.attach')}>
-                    <Icon src={ICONS.IMPORT} size="sm" />
+                    <Icon src={ICONS.IMPORT} size="sm" alt="" />
                 </button>
                 <input ref={chatFileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onAttachFile} />
                 <textarea
@@ -93,10 +104,10 @@ function ChatInput({
                     type={isGenerating ? 'button' : 'submit'}
                     className={`chat-send-btn ${isGenerating ? 'stop' : ''}`}
                     onClick={isGenerating ? onAbort : undefined}
-                    disabled={!isGenerating && isWorking}
+                    disabled={!isGenerating && (isWorking || !chatInput.trim())}
                     aria-label={isGenerating ? t('workspace.stop') : t('workspace.send')}
                 >
-                    <Icon src={isGenerating ? ICONS.STOP : ICONS.EXECUTE} size="sm" />
+                    <Icon src={isGenerating ? ICONS.STOP : ICONS.EXECUTE} size="sm" alt="" />
                 </button>
             </form>
             <div className="chat-input-hint">{t('ux.composerHint')}</div>
