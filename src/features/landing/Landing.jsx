@@ -1,13 +1,11 @@
 /**
  * Landing Page
- * OpenContent IDE
- *
- * Main entry point - centered input with direct-to-action philosophy.
+ * Prompt-first entry without implicit model selection.
  */
-
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Landing.css';
+import './LandingUx.css';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -17,69 +15,84 @@ import Modal from '../../components/common/Modal';
 import Starfield from '../../components/effects/Starfield';
 import ModelSelector from '../../components/model/ModelSelector';
 import { ROUTES, STORAGE_KEYS } from '../../config/constants';
-import { getActiveTextModel, getActiveVisionModel, getActiveImageModel, isAIConfigured } from '../../services/ai';
+import { getActiveTextModel, getActiveVisionModel, getActiveImageModel, getTextModelOptions, isAIConfigured } from '../../services/ai';
 import QuickPrompts from '../workspace/components/QuickPrompts';
 import { syncBrowserClientConfig } from '../../services/externalSessions';
 import '../workspace/components/FeatureComponents.css';
+
+function setOrRemove(key, value) {
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+}
 
 function Landing() {
     const navigate = useNavigate();
     const { t, language } = useLanguage();
     const { isDark, toggleTheme } = useTheme();
     const { isAuthenticated, profile } = useAuth();
-
     const [prompt, setPrompt] = useState('');
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const [displayPlaceholder, setDisplayPlaceholder] = useState('');
     const [isTyping, setIsTyping] = useState(true);
     const [showModelModal, setShowModelModal] = useState(false);
+    const [setupNotice, setSetupNotice] = useState(false);
+    const [reducedMotion, setReducedMotion] = useState(false);
     const [selectedTextModel, setSelectedTextModel] = useState(() => getActiveTextModel());
     const [selectedVisionModel, setSelectedVisionModel] = useState(() => getActiveVisionModel());
     const [selectedImageModel, setSelectedImageModel] = useState(() => getActiveImageModel());
-
     const inputRef = useRef(null);
 
+    const textModels = useMemo(() => getTextModelOptions().filter((model) => model.id), [showModelModal]);
+    const activeTextLabel = textModels.find((model) => model.id === selectedTextModel)?.nickname || selectedTextModel || t('workspace.model.noModelSelected');
+    const configured = isAIConfigured();
+
     useEffect(() => {
-        const placeholderHints = t('landing.placeholderHints') || [];
-        if (!Array.isArray(placeholderHints) || placeholderHints.length === 0) return;
-        const currentHint = placeholderHints[placeholderIndex];
-        let charIndex = 0;
-        let typeInterval;
-        let pauseTimeout;
+        const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+        if (!media) return;
+        const update = () => setReducedMotion(media.matches);
+        update();
+        media.addEventListener?.('change', update);
+        return () => media.removeEventListener?.('change', update);
+    }, []);
+
+    useEffect(() => {
+        const hints = t('landing.placeholderHints') || [];
+        if (!Array.isArray(hints) || hints.length === 0) return;
+        const hint = hints[placeholderIndex];
+        if (reducedMotion) {
+            setDisplayPlaceholder(hint);
+            return;
+        }
+        let interval;
+        let pause;
         if (isTyping) {
-            typeInterval = setInterval(() => {
-                if (charIndex <= currentHint.length) {
-                    setDisplayPlaceholder(currentHint.substring(0, charIndex));
-                    charIndex++;
-                } else {
-                    clearInterval(typeInterval);
-                    pauseTimeout = setTimeout(() => setIsTyping(false), 2000);
+            let index = 0;
+            interval = window.setInterval(() => {
+                if (index <= hint.length) setDisplayPlaceholder(hint.substring(0, index++));
+                else {
+                    window.clearInterval(interval);
+                    pause = window.setTimeout(() => setIsTyping(false), 2000);
                 }
             }, 50);
         } else {
-            let eraseIndex = currentHint.length;
-            typeInterval = setInterval(() => {
-                if (eraseIndex >= 0) {
-                    setDisplayPlaceholder(currentHint.substring(0, eraseIndex));
-                    eraseIndex--;
-                } else {
-                    clearInterval(typeInterval);
-                    setPlaceholderIndex((prev) => (prev + 1) % placeholderHints.length);
+            let index = hint.length;
+            interval = window.setInterval(() => {
+                if (index >= 0) setDisplayPlaceholder(hint.substring(0, index--));
+                else {
+                    window.clearInterval(interval);
+                    setPlaceholderIndex((value) => (value + 1) % hints.length);
                     setIsTyping(true);
                 }
             }, 30);
         }
         return () => {
-            clearInterval(typeInterval);
-            clearTimeout(pauseTimeout);
+            window.clearInterval(interval);
+            window.clearTimeout(pause);
         };
-    }, [placeholderIndex, isTyping, t]);
+    }, [placeholderIndex, isTyping, reducedMotion, t]);
 
-    useEffect(() => {
-        inputRef.current?.focus();
-    }, []);
-
+    useEffect(() => { inputRef.current?.focus(); }, []);
     useEffect(() => {
         syncBrowserClientConfig({ activeTextModel: selectedTextModel, activeVisionModel: selectedVisionModel, activeImageModel: selectedImageModel });
     }, [selectedTextModel, selectedVisionModel, selectedImageModel]);
@@ -91,36 +104,46 @@ function Landing() {
         return () => window.clearInterval(timer);
     }, [selectedTextModel, selectedVisionModel, selectedImageModel]);
 
-    const handleSubmit = (e) => {
-        e?.preventDefault();
-        const trimmedPrompt = prompt.trim();
-        if (!trimmedPrompt || isTransitioning) return;
-        setIsTransitioning(true);
-        setTimeout(() => {
-            navigate(ROUTES.WORKSPACE, { state: { initialPrompt: trimmedPrompt } });
-        }, 800);
+    const resizeComposer = (element) => {
+        if (!element) return;
+        element.style.height = 'auto';
+        element.style.height = `${Math.min(element.scrollHeight, 180)}px`;
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            handleSubmit(e);
+    const handleSubmit = (event) => {
+        event?.preventDefault();
+        const trimmed = prompt.trim();
+        if (!trimmed || isTransitioning) return;
+        if (!configured) {
+            setSetupNotice(true);
+            return;
         }
+        if (!selectedTextModel) {
+            setShowModelModal(true);
+            return;
+        }
+        setIsTransitioning(true);
+        navigate(ROUTES.WORKSPACE, { state: { initialPrompt: trimmed } });
+    };
+
+    const handleKeyDown = (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) handleSubmit(event);
     };
 
     const handleSaveModelSelection = (textModel, imageModel, visionModel) => {
-        setSelectedTextModel(textModel);
-        setSelectedVisionModel(visionModel);
-        setSelectedImageModel(imageModel);
-        localStorage.setItem(STORAGE_KEYS.SELECTED_TEXT_MODEL, textModel);
-        localStorage.setItem(STORAGE_KEYS.SELECTED_VISION_MODEL, visionModel || '');
-        localStorage.setItem(STORAGE_KEYS.SELECTED_IMAGE_MODEL, imageModel);
+        setSelectedTextModel(textModel || null);
+        setSelectedVisionModel(visionModel || null);
+        setSelectedImageModel(imageModel || null);
+        setOrRemove(STORAGE_KEYS.SELECTED_TEXT_MODEL, textModel);
+        setOrRemove(STORAGE_KEYS.SELECTED_VISION_MODEL, visionModel);
+        setOrRemove(STORAGE_KEYS.SELECTED_IMAGE_MODEL, imageModel);
         setShowModelModal(false);
+        setSetupNotice(false);
     };
 
     return (
         <div className={`landing ${isTransitioning ? 'landing-transitioning' : ''}`}>
-            <Starfield starCount={200} />
-
+            {!reducedMotion && <Starfield starCount={200} />}
             <header className="landing-header">
                 <div className="header-left">
                     <button className="icon-button" onClick={toggleTheme} title={isDark ? t('settings.theme.light') : t('settings.theme.dark')}>
@@ -136,81 +159,58 @@ function Landing() {
                     </button>
                     {isAuthenticated ? (
                         <button className="user-avatar" onClick={() => navigate(ROUTES.SETTINGS)}>
-                            {profile?.avatarUrl ? (
-                                <img src={profile.avatarUrl} alt={profile.displayName} />
-                            ) : (
-                                <span>{profile?.displayName?.charAt(0) || '?'}</span>
-                            )}
+                            {profile?.avatarUrl ? <img src={profile.avatarUrl} alt={profile.displayName} /> : <span>{profile?.displayName?.charAt(0) || '?'}</span>}
                         </button>
                     ) : (
-                        <Button variant="secondary" size="sm" onClick={() => navigate(ROUTES.LOGIN)}>
-                            {t('auth.login')}
-                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => navigate(ROUTES.LOGIN)}>{t('auth.login')}</Button>
                     )}
                 </div>
             </header>
 
             <main className="landing-main">
                 <div className={`landing-content ${isTransitioning ? 'content-transitioning' : ''}`}>
-                    <div className="landing-logo">
-                        <Icon src={ICONS.LOGO} size={100} alt="OpenContent IDE" className="logo-icon" />
-                    </div>
-
-                    {isAuthenticated && profile?.displayName && (
-                        <p className="landing-greeting">
-                            {t('landing.greeting')}, <strong>{profile.displayName.split(' ')[0]}</strong>
-                        </p>
-                    )}
+                    <div className="landing-logo"><Icon src={ICONS.LOGO} size={100} alt="OpenContent IDE" className="logo-icon" /></div>
+                    {isAuthenticated && profile?.displayName && <p className="landing-greeting">{t('landing.greeting')}, <strong>{profile.displayName.split(' ')[0]}</strong></p>}
 
                     <form className="landing-form" onSubmit={handleSubmit}>
                         <div className="landing-input-wrapper">
-                            <input
+                            <textarea
                                 ref={inputRef}
-                                type="text"
+                                rows={1}
                                 className="landing-input"
                                 value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
+                                onChange={(event) => { setPrompt(event.target.value); resizeComposer(event.target); }}
                                 onKeyDown={handleKeyDown}
                                 placeholder={displayPlaceholder || t('landing.placeholder')}
                                 autoComplete="off"
                                 autoFocus
                             />
-                            <button type="submit" className={`landing-submit ${prompt.trim() ? 'visible' : ''}`} disabled={!prompt.trim()}>
+                            <button type="submit" className={`landing-submit ${prompt.trim() ? 'visible' : ''}`} disabled={!prompt.trim()} aria-label={t('landing.submit')}>
                                 <Icon src={ICONS.EXECUTE} size="md" animation="pop" />
                             </button>
                         </div>
                     </form>
 
-                    {!isAIConfigured() && (
-                        <button className="pro-upgrade-cta" onClick={() => navigate(ROUTES.SETTINGS)} title={t('settings.title')}>
-                            <Icon src={ICONS.SETTINGS} size={18} />
-                            <span>{t('landing.setupApiKeys')}</span>
-                        </button>
+                    <button className="landing-model-chip" type="button" onClick={() => setShowModelModal(true)}>
+                        {activeTextLabel}
+                    </button>
+
+                    {(!configured || setupNotice) && (
+                        <div className="landing-provider-notice" role="status">
+                            <span>{t('landing.providerRequired')}</span>
+                            <button type="button" onClick={() => navigate(ROUTES.SETTINGS)}>{t('landing.addProvider')}</button>
+                        </div>
                     )}
 
-                    {isAIConfigured() && (
-                        <QuickPrompts
-                            language={language}
-                            onSelect={(p) => { setPrompt(p); inputRef.current?.focus(); }}
-                            hasApiKeys={true}
-                        />
-                    )}
+                    {configured && <QuickPrompts language={language} onSelect={(value) => { setPrompt(value); inputRef.current?.focus(); }} hasApiKeys={true} />}
                 </div>
             </main>
 
             <footer className="landing-footer">
-                <button className="icon-button" onClick={() => navigate(ROUTES.SETTINGS)} title={t('settings.title')}>
-                    <Icon src={ICONS.SETTINGS} size="sm" animation="spin" />
-                </button>
+                <button className="icon-button" onClick={() => navigate(ROUTES.SETTINGS)} title={t('settings.title')}><Icon src={ICONS.SETTINGS} size="sm" animation="spin" /></button>
             </footer>
 
-            <Modal
-                isOpen={showModelModal}
-                onClose={() => setShowModelModal(false)}
-                title={t('workspace.model.title')}
-                className="modal-model"
-                footer={null}
-            >
+            <Modal isOpen={showModelModal} onClose={() => setShowModelModal(false)} title={t('workspace.model.title')} className="modal-model" footer={null}>
                 <ModelSelector
                     textModel={selectedTextModel}
                     visionModel={selectedVisionModel}
