@@ -21,7 +21,8 @@ export const ROUTES = {
     LOGIN: '/login',
     PROJECT: '/project/:id',
     CLI: '/cli',
-    GALLERY: '/gallery'
+    GALLERY: '/gallery',
+    ARTIFACTS: '/artifacts'
 };
 
 // Local storage keys
@@ -49,7 +50,8 @@ export const STORAGE_KEYS = {
     TOOL_CALLING_ENABLED: 'oc_tool_calling_enabled',
     LOCAL_SAVE_SETTINGS: 'oc_local_save_settings',
     IMAGE_ARTIFACTS: 'oc_image_artifacts',
-    BRAND_KIT: 'oc_brand_kit'
+    BRAND_KIT: 'oc_brand_kit',
+    ARTIFACT_STUDIO: 'oc_artifact_studio'
 };
 
 // Theme values
