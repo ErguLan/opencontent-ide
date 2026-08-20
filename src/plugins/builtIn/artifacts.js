@@ -4,14 +4,112 @@ import { ARTIFACT_TYPES, deleteArtifact, listArtifacts, saveArtifact } from '../
 import { createDiagramArtifact, diagramToSvg, parseDiagramDsl } from '../../services/artifacts/diagramEngine.js';
 import { createDocumentArtifact, documentFromText, serializeDocumentToPdf } from '../../services/artifacts/pdfEngine.js';
 import { getActiveTextModel, sendToAI } from '../../services/ai/index.js';
-function download(content, filename, type) { const blob = content instanceof Blob ? content : new Blob([content], { type }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-async function resolveArtifact(fragment) { const items = await listArtifacts(); return items.find((item) => item.id === fragment || item.id.includes(fragment || '')); }
-export default { name: 'artifact-studio', version: '1.0.0', register(manager) {
-  manager.addHook(HOOKS.WORKSPACE_TOOLBAR, (items) => [...items, { label: 'Artifact Studio', action: () => { window.location.href = ROUTES.ARTIFACTS; } }]);
-  manager.addHook(HOOKS.CLI_COMMAND, (commands) => [...commands,
-    { name:'artifact',description:'List, open, inspect, export, or delete artifacts',usage:'artifact [list|open|info|export|delete] [id]',argHints:['list','open','info','export','delete'],run:async({args})=>{const action=args[0]||'list';if(action==='list'){const items=await listArtifacts();return{type:'info',message:items.length?items.map(i=>`${i.id}  ${i.type}  ${i.name}`).join('\n'):'No artifacts.'};}if(action==='open'){window.location.href=ROUTES.ARTIFACTS;return{type:'success',message:'Opening Artifact Studio.'};}const artifact=await resolveArtifact(args[1]);if(!artifact)return{type:'error',message:'Artifact not found.'};if(action==='info')return{type:'info',message:JSON.stringify({id:artifact.id,type:artifact.type,name:artifact.name,updatedAt:artifact.updatedAt,versions:artifact.versions?.length||0},null,2)};if(action==='delete'){await deleteArtifact(artifact.id);return{type:'success',message:`Deleted ${artifact.name}`};}if(action==='export'){if(artifact.type===ARTIFACT_TYPES.DIAGRAM)download(diagramToSvg(artifact),`${artifact.name}.svg`,'image/svg+xml');else if(artifact.type===ARTIFACT_TYPES.DOCUMENT)download(serializeDocumentToPdf(artifact),`${artifact.name}.pdf`,'application/pdf');else return{type:'info',message:'Imported PDFs are exported from Artifact Studio to preserve the original binary.'};return{type:'success',message:`Exported ${artifact.name}`};}return{type:'info',message:'Usage: artifact [list|open|info|export|delete] [id]'};}},
-    { name:'diagram',description:'Create a structured diagram from a simple DSL',usage:'diagram <A -> B; B -> C>',run:async({args})=>{const input=args.join(' ').replace(/\s*;\s*/g,'\n');const artifact=await saveArtifact(input?parseDiagramDsl(input):createDiagramArtifact());return{type:'success',message:`Created diagram ${artifact.id}: ${artifact.name}`};}},
-    { name:'document',description:'Create an editable document, optionally using AI',usage:'document <prompt> [--ai]',run:async({args,flags})=>{const text=args.join(' ')||'Untitled document';let artifact;if(flags.ai){const model=getActiveTextModel();if(!model)return{type:'error',message:'No text model configured.'};const response=await sendToAI(text,model);if(!response.success)return{type:'error',message:response.error||'Generation failed.'};artifact=documentFromText(response.content,{name:text.slice(0,60)});}else artifact=createDocumentArtifact({name:text.slice(0,60)});artifact=await saveArtifact(artifact);return{type:'success',message:`Created document ${artifact.id}`};}}
-  ]);
-  manager.addHook(HOOKS.ARTIFACT_IMPORT,(context)=>context); manager.addHook(HOOKS.ARTIFACT_EXPORT,(context)=>context); manager.addHook(HOOKS.ARTIFACT_OPERATION_BEFORE,(context)=>context); manager.addHook(HOOKS.ARTIFACT_OPERATION_AFTER,(context)=>context);
-} };
+
+function download(content, filename, type) {
+    const blob = content instanceof Blob ? content : new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function resolveArtifact(fragment) {
+    const items = await listArtifacts();
+    return items.find((item) => item.id === fragment || item.id.includes(fragment || ''));
+}
+
+export default {
+    name: 'artifact-studio',
+    version: '1.1.0',
+    register(manager) {
+        manager.addHook(HOOKS.WORKSPACE_TOOLBAR, (items) => [
+            ...items,
+            {
+                label: 'Artifact Studio',
+                action: () => {
+                    window.history.pushState({}, '', ROUTES.ARTIFACTS);
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                }
+            }
+        ]);
+
+        manager.addHook(HOOKS.CLI_COMMAND, (commands) => [
+            ...commands,
+            {
+                name: 'artifact',
+                category: 'artifacts',
+                description: 'List, open, inspect, export, or delete artifacts',
+                usage: 'artifact [list|open|info|export|delete] [id] [--force]',
+                argHints: ['list', 'open', 'info', 'export', 'delete'],
+                run: async ({ args, flags, context }) => {
+                    const action = args[0] || 'list';
+                    if (action === 'list') {
+                        const items = await listArtifacts();
+                        return { type: 'info', message: items.length ? items.map((item) => `${item.id}  ${item.type}  ${item.name}`).join('\n') : 'No artifacts.' };
+                    }
+                    if (action === 'open') {
+                        const target = args[1] ? `${ROUTES.ARTIFACTS}/${args[1]}` : ROUTES.ARTIFACTS;
+                        context?.navigate?.(target);
+                        return { type: 'success', message: 'Opening Artifact Studio.' };
+                    }
+                    const artifact = await resolveArtifact(args[1]);
+                    if (!artifact) return { type: 'error', message: 'Artifact not found.' };
+                    if (action === 'info') {
+                        return { type: 'info', message: JSON.stringify({ id: artifact.id, type: artifact.type, name: artifact.name, updatedAt: artifact.updatedAt, versions: artifact.versions?.length || 0 }, null, 2) };
+                    }
+                    if (action === 'delete') {
+                        if (!flags.force) return { type: 'warning', message: `Delete ${artifact.name}? Re-run with --force to confirm.` };
+                        await deleteArtifact(artifact.id);
+                        return { type: 'success', message: `Deleted ${artifact.name}` };
+                    }
+                    if (action === 'export') {
+                        if (artifact.type === ARTIFACT_TYPES.DIAGRAM) download(diagramToSvg(artifact), `${artifact.name}.svg`, 'image/svg+xml');
+                        else if (artifact.type === ARTIFACT_TYPES.DOCUMENT) download(serializeDocumentToPdf(artifact), `${artifact.name}.pdf`, 'application/pdf');
+                        else return { type: 'info', message: 'Imported PDFs keep their original binary. Use Artifact Studio to download the original.' };
+                        return { type: 'success', message: `Exported ${artifact.name}` };
+                    }
+                    return { type: 'info', message: 'Usage: artifact [list|open|info|export|delete] [id] [--force]' };
+                }
+            },
+            {
+                name: 'diagram',
+                category: 'artifacts',
+                description: 'Create a structured diagram from a simple DSL',
+                usage: 'diagram <A -> B; B -> C>',
+                run: async ({ args }) => {
+                    const input = args.join(' ').replace(/\s*;\s*/g, '\n');
+                    const artifact = await saveArtifact(input ? parseDiagramDsl(input) : createDiagramArtifact());
+                    return { type: 'success', message: `Created diagram ${artifact.id}: ${artifact.name}` };
+                }
+            },
+            {
+                name: 'document',
+                category: 'artifacts',
+                description: 'Create an editable document, optionally using AI',
+                usage: 'document <prompt> [--ai]',
+                run: async ({ args, flags }) => {
+                    const text = args.join(' ') || 'Untitled document';
+                    let artifact;
+                    if (flags.ai) {
+                        const model = getActiveTextModel();
+                        if (!model) return { type: 'error', message: 'No text model selected.' };
+                        const response = await sendToAI(text, model);
+                        if (!response.success) return { type: 'error', message: response.error || 'Generation failed.' };
+                        artifact = documentFromText(response.content, { name: text.slice(0, 60) });
+                    } else {
+                        artifact = createDocumentArtifact({ name: text.slice(0, 60) });
+                    }
+                    artifact = await saveArtifact(artifact);
+                    return { type: 'success', message: `Created document ${artifact.id}` };
+                }
+            }
+        ]);
+
+        manager.addHook(HOOKS.ARTIFACT_IMPORT, (context) => context);
+        manager.addHook(HOOKS.ARTIFACT_EXPORT, (context) => context);
+        manager.addHook(HOOKS.ARTIFACT_OPERATION_BEFORE, (context) => context);
+        manager.addHook(HOOKS.ARTIFACT_OPERATION_AFTER, (context) => context);
+    }
+};
