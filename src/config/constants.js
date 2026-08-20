@@ -17,10 +17,12 @@ export const CLI_ACCESS = import.meta.env.VITE_CLI_ACCESS || 'public'; // 'publi
 export const ROUTES = {
     LANDING: '/',
     WORKSPACE: '/workspace',
+    SETUP: '/setup',
     SETTINGS: '/settings',
     LOGIN: '/login',
     PROJECT: '/project/:id',
     CLI: '/cli',
+    LIBRARY: '/library',
     GALLERY: '/gallery',
     ARTIFACTS: '/artifacts'
 };
