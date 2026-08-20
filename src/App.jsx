@@ -18,6 +18,7 @@ import Settings from './features/settings/Settings';
 import Login from './features/auth/Login';
 import CliPage from './features/cli/CliPage';
 import GalleryPage from './features/gallery/GalleryPage';
+import ArtifactStudio from './features/artifacts/ArtifactStudio';
 
 // Styles
 import './styles/global.css';
@@ -51,6 +52,9 @@ function App() {
 
                                 {/* Gallery */}
                                 <Route path={ROUTES.GALLERY} element={<GalleryPage />} />
+
+                                {/* Artifact Studio */}
+                                <Route path={ROUTES.ARTIFACTS} element={<ArtifactStudio />} />
 
                                 {/* Fallback - redirect to landing */}
                                 <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
