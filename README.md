@@ -19,6 +19,8 @@
 - **Skills System** — Switchable AI personas (Content Creator, SEO Writer, Copywriter, etc.)
 - **Local-First** — Projects and media stored in IndexedDB. Settings and keys in localStorage.
 - **Chat Memory** — Persistent conversation history per project.
+- **Streaming Responses** — Real-time SSE streaming for OpenAI and OpenRouter with incremental chunk callbacks.
+- **Plugin System** — Hook-based extensions for CLI, workspace, generation, settings, and artifact workflows.
 - **Media Panel** — Upload, tag, search, preview, and attach assets to prompts.
 - **Mini CLI** — Command palette for quick actions inside the workspace.
 - **Copy as API** — Generate curl/JS/Python snippets from any prompt.
@@ -235,8 +237,8 @@ Highlights:
 - [x] Media Panel and asset management
 - [x] Command Palette (mini CLI)
 - [x] GitHub Actions CI
-- [ ] Streaming responses
-- [ ] Plugin system
+- [x] Streaming responses (OpenAI + OpenRouter)
+- [x] Plugin system with hook extensions
 - [ ] More languages (PT, FR, DE)
 - [ ] GitHub Pages demo
 
