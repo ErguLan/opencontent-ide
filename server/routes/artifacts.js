@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { ARTIFACT_TYPES, applyArtifactOperation, createArtifact } from '../../src/services/artifacts/artifactEngine.js';
+import { diagramToSvg, parseDiagramDsl } from '../../src/services/artifacts/diagramEngine.js';
+import { documentFromText, serializeDocumentToPdf } from '../../src/services/artifacts/pdfEngine.js';
+const router = Router();
+router.post('/artifacts/operate', (req, res) => { try { const artifact = createArtifact(req.body?.artifact || {}); const operations = Array.isArray(req.body?.operations) ? req.body.operations : []; if (operations.length > 200) return res.status(400).json({ success:false,error:'TOO_MANY_OPERATIONS' }); const result = operations.reduce((current, operation) => applyArtifactOperation(current, operation), artifact); res.json({ success:true,artifact:result }); } catch (error) { res.status(400).json({ success:false,error:error.message }); } });
+router.post('/artifacts/diagram', (req, res) => { try { const artifact = req.body?.artifact || parseDiagramDsl(req.body?.dsl || req.body?.prompt || ''); res.json({ success:true,artifact,svg:diagramToSvg(artifact) }); } catch (error) { res.status(400).json({ success:false,error:error.message }); } });
+router.post('/artifacts/document', (req, res) => { try { const artifact = documentFromText(req.body?.text || '', { name:req.body?.name || 'OpenContent document',pageSize:req.body?.pageSize || 'a4' }); res.json({ success:true,artifact }); } catch (error) { res.status(400).json({ success:false,error:error.message }); } });
+router.post('/artifacts/pdf/render', async (req, res) => { try { const artifact = createArtifact({ ...req.body?.artifact,type:req.body?.artifact?.type || ARTIFACT_TYPES.DOCUMENT }); if (artifact.type !== ARTIFACT_TYPES.DOCUMENT) return res.status(400).json({ success:false,error:'DOCUMENT_ARTIFACT_REQUIRED' }); const blob = serializeDocumentToPdf(artifact); const bytes = Buffer.from(await blob.arrayBuffer()); res.json({ success:true,mimeType:'application/pdf',base64:bytes.toString('base64'),bytes:bytes.length }); } catch (error) { res.status(400).json({ success:false,error:error.message }); } });
+export default router;
