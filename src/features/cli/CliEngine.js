@@ -1,14 +1,6 @@
 /**
  * CliEngine — Extensible command engine for the OpenContent IDE CLI.
- *
- * Supports:
- *   - Named command registration with description, usage, and argument hints.
- *   - Tokenization with single/double quote support.
- *   - Flag parsing: --key value and --boolean.
- *   - Contextual autocomplete (command names + per-command argument hints).
- *   - History of executed commands.
  */
-
 export class CliEngine {
     constructor(context = {}) {
         this.commands = new Map();
@@ -19,127 +11,94 @@ export class CliEngine {
     register(command) {
         if (!command?.name) throw new Error('Command must have a name');
         this.commands.set(command.name, command);
-        if (command.aliases) {
-            command.aliases.forEach((alias) => this.commands.set(alias, command));
-        }
+        command.aliases?.forEach((alias) => this.commands.set(alias, command));
         return this;
     }
 
     parse(input) {
         const trimmed = input.trim();
         if (!trimmed) return { command: '', args: [], flags: {} };
-
         const tokens = [];
         let current = '';
         let quote = null;
-
-        for (let i = 0; i < trimmed.length; i++) {
-            const char = trimmed[i];
-            const prev = trimmed[i - 1];
-
+        for (let index = 0; index < trimmed.length; index += 1) {
+            const char = trimmed[index];
+            const prev = trimmed[index - 1];
             if (quote) {
-                if (char === quote && prev !== '\\') {
-                    tokens.push(current);
-                    current = '';
-                    quote = null;
-                } else {
-                    current += char;
-                }
-            } else if (char === '"' || char === "'") {
-                quote = char;
-            } else if (char === ' ' || char === '\t') {
-                if (current) {
-                    tokens.push(current);
-                    current = '';
-                }
-            } else {
-                current += char;
-            }
+                if (char === quote && prev !== '\\') { tokens.push(current); current = ''; quote = null; }
+                else current += char;
+            } else if (char === '"' || char === "'") quote = char;
+            else if (char === ' ' || char === '\t') { if (current) { tokens.push(current); current = ''; } }
+            else current += char;
         }
         if (current) tokens.push(current);
 
         const args = [];
         const flags = {};
-        for (let i = 0; i < tokens.length; i++) {
-            const token = tokens[i];
+        for (let index = 0; index < tokens.length; index += 1) {
+            const token = tokens[index];
             if (token.startsWith('--')) {
                 const key = token.slice(2);
-                const next = tokens[i + 1];
-                if (next && !next.startsWith('--')) {
-                    flags[key] = next;
-                    i++;
-                } else {
-                    flags[key] = true;
-                }
-            } else if (i === 0) {
-                // command name, skip in args
-            } else {
-                args.push(token);
+                const next = tokens[index + 1];
+                if (next && !next.startsWith('--')) { flags[key] = next; index += 1; }
+                else flags[key] = true;
+            } else if (index > 0) args.push(token);
+        }
+        return { command: tokens[0] || '', args, flags };
+    }
+
+    distance(left, right) {
+        const a = String(left || '');
+        const b = String(right || '');
+        const rows = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+        for (let i = 0; i <= a.length; i += 1) rows[i][0] = i;
+        for (let j = 0; j <= b.length; j += 1) rows[0][j] = j;
+        for (let i = 1; i <= a.length; i += 1) {
+            for (let j = 1; j <= b.length; j += 1) {
+                rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
             }
         }
+        return rows[a.length][b.length];
+    }
 
-        return { command: tokens[0] || '', args, flags };
+    suggestCommand(input) {
+        const names = this.getHelp().map((command) => command.name);
+        const best = names.map((name) => ({ name, score: this.distance(input, name) })).sort((a, b) => a.score - b.score)[0];
+        return best && best.score <= Math.max(2, Math.floor(input.length / 2)) ? best.name : null;
     }
 
     async execute(input) {
         const { command, args, flags } = this.parse(input);
         if (!command) return { type: 'info', message: '' };
-
         this.history.push({ input, timestamp: Date.now() });
-
         const cmd = this.commands.get(command);
         if (!cmd) {
-            return {
-                type: 'error',
-                message: `Unknown command: ${command}. Type 'help' for available commands.`
-            };
+            const suggestion = this.suggestCommand(command);
+            return { type: 'error', message: `Unknown command: ${command}.${suggestion ? ` Did you mean '${suggestion}'?` : " Type 'help' for available commands."}` };
         }
-
         try {
             const result = await cmd.run({ args, flags, raw: input, engine: this, context: this.context });
             return result || { type: 'success', message: '' };
-        } catch (err) {
-            return { type: 'error', message: err?.message || String(err) };
+        } catch (error) {
+            return { type: 'error', message: error?.message || String(error) };
         }
     }
 
     autocomplete(input) {
-        const trimmed = input.trim();
-        if (!trimmed) {
-            return Array.from(this.commands.values())
-                .filter((cmd) => !cmd.hidden)
-                .map((cmd) => cmd.name)
-                .filter((v, i, a) => a.indexOf(v) === i);
-        }
-
-        const { command, args } = this.parse(input);
+        const raw = String(input || '');
+        const trimmed = raw.trim();
+        if (!trimmed) return this.getHelp().map((command) => command.name);
+        const { command, args } = this.parse(raw);
         const cmd = this.commands.get(command);
-
-        // Suggest arguments for a matched command
-        if (cmd && args.length > 0 && input.endsWith(' ')) {
-            return (cmd.argHints || []).filter((hint) => !args.includes(hint));
-        }
-
-        // Suggest command names
-        return Array.from(this.commands.values())
-            .filter((c) => !c.hidden && c.name.startsWith(command))
-            .map((c) => c.name)
-            .filter((v, i, a) => a.indexOf(v) === i);
+        if (cmd && raw.endsWith(' ')) return (cmd.argHints || []).filter((hint) => !args.includes(hint));
+        return this.getHelp().map((item) => item.name).filter((name) => name.startsWith(command));
     }
 
-    getHistory() {
-        return this.history.slice();
-    }
-
+    getHistory() { return this.history.slice(); }
     getHelp() {
-        const list = Array.from(this.commands.values())
-            .filter((cmd) => !cmd.hidden)
-            .filter((v, i, a) => a.findIndex((c) => c.name === v.name) === i)
-            .map((cmd) => ({
-                name: cmd.name,
-                description: cmd.description || '',
-                usage: cmd.usage || cmd.name
-            }));
-        return list;
+        return Array.from(this.commands.values())
+            .filter((command) => !command.hidden)
+            .filter((value, index, array) => array.findIndex((command) => command.name === value.name) === index)
+            .map((command) => ({ name: command.name, description: command.description || '', usage: command.usage || command.name, category: command.category || 'general' }));
     }
 }
