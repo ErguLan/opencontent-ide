@@ -2,6 +2,31 @@
 
 All notable changes to OpenContent IDE will be documented in this file.
 
+## [0.9.3] — 2026-08-20
+
+### Added
+- Artifact Engine with editable diagram, document, and PDF artifact types.
+- Artifact Studio with AI-assisted structured operations, versioning, undo/redo, import/export, and protected PDF originals.
+- Rust/WASM-ready `oc-core` for deterministic validation and artifact operations.
+- Artifact REST API, MCP tools, plugin hooks, browser CLI commands, and standalone CLI parity.
+- Global Command Palette and keyboard-first navigation.
+- Unified Library for media and artifacts.
+- Dedicated AI Setup for provider registration, explicit model registration, and independent text/vision/image selection.
+- Additional UX states, accessibility improvements, search/filtering, save feedback, safer destructive actions, and CLI diagnostics.
+
+### Changed
+- Model registry now starts empty and OpenContent never auto-selects vendor models.
+- Stale or unknown model IDs remain unconfigured instead of receiving implicit providers/capabilities.
+- Ollama is considered configured only when the user has explicitly registered compatible models.
+- Landing and Workspace onboarding now use explicit provider/model setup language.
+- Imported PDF editing is explicitly non-destructive; the original remains protected until edits are truly embedded.
+- CLI remote requests use protocol-safe fetch behavior and support scripting-oriented output and status commands.
+- Gallery deletion now supports a short Undo window.
+
+### Documentation
+- Added Artifact system documentation.
+- Added `docs/technical-debt/WORKSPACE_MODEL_SELECTION.md` to track the remaining Workspace model-selection and legacy UX cleanup without hiding the debt.
+
 ## [0.1.0] — 2026-05-19
 
 ### Added
