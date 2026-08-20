@@ -1,9 +1,8 @@
 /**
- * GalleryPage — Browse all generated and uploaded images.
- * OpenContent IDE
+ * GalleryPage — Browse generated and uploaded images.
+ * Destructive deletion is delayed so users can undo mistakes.
  */
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import Icon, { ICONS } from '../../components/icons/Icon';
@@ -17,12 +16,15 @@ export default function GalleryPage() {
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [previewAsset, setPreviewAsset] = useState(null);
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const deleteTimerRef = useRef(null);
+    const pendingDeleteRef = useRef(null);
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
             const all = await getAllMedia();
-            setAssets(all.reverse());
+            setAssets([...all].reverse());
         } catch {
             setAssets([]);
         } finally {
@@ -32,11 +34,53 @@ export default function GalleryPage() {
 
     useEffect(() => { load(); }, [load]);
 
-    const handleDelete = useCallback(async (id) => {
-        await deleteMedia(id);
-        setAssets((prev) => prev.filter((a) => a.id !== id));
-        if (previewAsset?.id === id) setPreviewAsset(null);
-    }, [previewAsset]);
+    useEffect(() => () => {
+        if (deleteTimerRef.current) window.clearTimeout(deleteTimerRef.current);
+        if (pendingDeleteRef.current?.asset?.id) deleteMedia(pendingDeleteRef.current.asset.id).catch(() => {});
+    }, []);
+
+    const commitPendingDelete = useCallback(async () => {
+        const current = pendingDeleteRef.current;
+        if (!current?.asset?.id) return;
+        if (deleteTimerRef.current) window.clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
+        pendingDeleteRef.current = null;
+        setPendingDelete(null);
+        await deleteMedia(current.asset.id);
+    }, []);
+
+    const handleDelete = useCallback(async (asset) => {
+        if (!asset?.id) return;
+        if (pendingDeleteRef.current) await commitPendingDelete();
+        const index = assets.findIndex((item) => item.id === asset.id);
+        const pending = { asset, index: Math.max(0, index) };
+        pendingDeleteRef.current = pending;
+        setPendingDelete(pending);
+        setAssets((previous) => previous.filter((item) => item.id !== asset.id));
+        if (previewAsset?.id === asset.id) setPreviewAsset(null);
+        deleteTimerRef.current = window.setTimeout(() => {
+            const current = pendingDeleteRef.current;
+            if (!current?.asset?.id) return;
+            deleteMedia(current.asset.id).catch(() => {});
+            pendingDeleteRef.current = null;
+            deleteTimerRef.current = null;
+            setPendingDelete(null);
+        }, 7000);
+    }, [assets, commitPendingDelete, previewAsset]);
+
+    const undoDelete = useCallback(() => {
+        const pending = pendingDeleteRef.current;
+        if (!pending) return;
+        if (deleteTimerRef.current) window.clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
+        pendingDeleteRef.current = null;
+        setPendingDelete(null);
+        setAssets((previous) => {
+            const next = [...previous];
+            next.splice(Math.min(pending.index, next.length), 0, pending.asset);
+            return next;
+        });
+    }, []);
 
     const handleDownload = useCallback((asset) => {
         if (!asset?.data) return;
@@ -54,7 +98,7 @@ export default function GalleryPage() {
         <div className="gallery-page">
             <header className="gallery-header">
                 <button className="icon-button" onClick={() => navigate(ROUTES.WORKSPACE)} aria-label={t('common.back')}>
-                    <Icon src={ICONS.CLOSE} size="sm" />
+                    <Icon src={ICONS.CLOSE} size="sm" alt="" />
                 </button>
                 <h1>{t('gallery.title')}</h1>
                 <span className="gallery-count">{assets.length} {t('gallery.assets')}</span>
@@ -62,14 +106,14 @@ export default function GalleryPage() {
 
             {loading && (
                 <div className="gallery-empty">
-                    <Icon src={ICONS.LOADING || ICONS.EMPTY} size="lg" />
+                    <Icon src={ICONS.LOADING || ICONS.EMPTY} size="lg" alt="" />
                     <p>{t('common.loading')}</p>
                 </div>
             )}
 
             {!loading && assets.length === 0 && (
                 <div className="gallery-empty">
-                    <Icon src={ICONS.EMPTY} size="xl" />
+                    <Icon src={ICONS.EMPTY} size="xl" alt="" />
                     <p>{t('gallery.empty')}</p>
                 </div>
             )}
@@ -78,30 +122,15 @@ export default function GalleryPage() {
                 <div className="gallery-grid">
                     {assets.map((asset) => (
                         <div key={asset.id} className="gallery-item" onClick={() => setPreviewAsset(asset)}>
-                            <img
-                                src={asset.data}
-                                alt={asset.name || 'Asset'}
-                                className="gallery-thumb"
-                                loading="lazy"
-                            />
+                            <img src={asset.data} alt={asset.name || 'Asset'} className="gallery-thumb" loading="lazy" />
                             <div className="gallery-item-overlay">
                                 <span className="gallery-item-name">{asset.name}</span>
                                 <div className="gallery-item-actions">
-                                    <button
-                                        type="button"
-                                        className="gallery-action-btn"
-                                        onClick={(e) => { e.stopPropagation(); handleDownload(asset); }}
-                                        title={t('common.download')}
-                                    >
-                                        <Icon src={ICONS.DOWNLOAD} size="xs" />
+                                    <button type="button" className="gallery-action-btn" onClick={(event) => { event.stopPropagation(); handleDownload(asset); }} title={t('common.download')}>
+                                        <Icon src={ICONS.DOWNLOAD} size="xs" alt="" />
                                     </button>
-                                    <button
-                                        type="button"
-                                        className="gallery-action-btn gallery-action-danger"
-                                        onClick={(e) => { e.stopPropagation(); handleDelete(asset.id); }}
-                                        title={t('common.delete')}
-                                    >
-                                        <Icon src={ICONS.DELETE} size="xs" />
+                                    <button type="button" className="gallery-action-btn gallery-action-danger" onClick={(event) => { event.stopPropagation(); handleDelete(asset); }} title={t('common.delete')}>
+                                        <Icon src={ICONS.DELETE} size="xs" alt="" />
                                     </button>
                                 </div>
                             </div>
@@ -112,28 +141,18 @@ export default function GalleryPage() {
 
             {previewAsset && (
                 <div className="gallery-preview-overlay" onClick={() => setPreviewAsset(null)}>
-                    <div className="gallery-preview" onClick={(e) => e.stopPropagation()}>
-                        <button className="gallery-preview-close" onClick={() => setPreviewAsset(null)}>
-                            <Icon src={ICONS.CLOSE} size="sm" />
+                    <div className="gallery-preview" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={previewAsset.name}>
+                        <button className="gallery-preview-close" onClick={() => setPreviewAsset(null)} aria-label={t('common.close')}>
+                            <Icon src={ICONS.CLOSE} size="sm" alt="" />
                         </button>
                         <img src={previewAsset.data} alt={previewAsset.name} className="gallery-preview-img" />
                         <div className="gallery-preview-info">
                             <span>{previewAsset.name}</span>
                             <span>{new Date(previewAsset.createdAt).toLocaleDateString()}</span>
-                            <button
-                                type="button"
-                                className="gallery-preview-download"
-                                onClick={() => handleDownload(previewAsset)}
-                            >
-                                <Icon src={ICONS.DOWNLOAD} size="xs" /> {t('common.download')}
+                            <button type="button" className="gallery-preview-download" onClick={() => handleDownload(previewAsset)}>
+                                <Icon src={ICONS.DOWNLOAD} size="xs" alt="" /> {t('common.download')}
                             </button>
-                            <button
-                                type="button"
-                                className="gallery-preview-download"
-                                onClick={() => handleUseAsReference(previewAsset)}
-                            >
-                                {t('gallery.useAsReference')}
-                            </button>
+                            <button type="button" className="gallery-preview-download" onClick={() => handleUseAsReference(previewAsset)}>{t('gallery.useAsReference')}</button>
                             <div className="gallery-preview-metadata">
                                 <span>{previewAsset.kind || 'asset'}</span>
                                 {previewAsset.model && <span>{previewAsset.model}</span>}
@@ -142,6 +161,13 @@ export default function GalleryPage() {
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {pendingDelete && (
+                <div className="gallery-undo-toast" role="status" aria-live="polite">
+                    <span>{t('ux.deleted', { name: pendingDelete.asset.name || t('gallery.assets') })}</span>
+                    <button type="button" onClick={undoDelete}>{t('ux.undo')}</button>
                 </div>
             )}
         </div>
