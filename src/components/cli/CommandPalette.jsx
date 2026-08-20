@@ -33,10 +33,10 @@ function CommandPalette({ isOpen, onClose, commands = [] }) {
     const inputRef = useRef(null);
 
     const defaultCommands = useMemo(() => [
-        { id: 'new-project', category: 'create', label: t('cli.newProject'), shortcut: 'Ctrl/⌘ N', keywords: ['new', 'project', 'create'], action: () => navigate('/') },
+        { id: 'new-project', category: 'create', label: t('cli.newProject'), keywords: ['new', 'project', 'create'], action: () => navigate('/') },
         { id: 'open-settings', category: 'navigation', label: t('cli.openSettings'), shortcut: 'Ctrl/⌘ ,', keywords: ['settings', 'provider', 'models', 'config'], action: () => navigate('/settings') },
-        { id: 'toggle-theme', category: 'appearance', label: t('cli.toggleTheme'), shortcut: 'T', keywords: ['theme', 'dark', 'light'], action: () => toggleTheme() },
-        { id: 'switch-language', category: 'appearance', label: language === 'es' ? t('cli.switchToEnglish') : t('cli.switchToSpanish'), shortcut: 'L', keywords: ['language', 'idioma', 'english', 'spanish'], action: () => changeLanguage(language === 'es' ? 'en' : 'es') },
+        { id: 'toggle-theme', category: 'appearance', label: t('cli.toggleTheme'), keywords: ['theme', 'dark', 'light'], action: () => toggleTheme() },
+        { id: 'switch-language', category: 'appearance', label: language === 'es' ? t('cli.switchToEnglish') : t('cli.switchToSpanish'), keywords: ['language', 'idioma', 'english', 'spanish'], action: () => changeLanguage(language === 'es' ? 'en' : 'es') },
         { id: 'open-cli', category: 'navigation', label: t('cli.title'), shortcut: 'Ctrl/⌘ `', keywords: ['cli', 'terminal', 'command'], action: () => navigate('/cli') }
     ], [t, language, changeLanguage, toggleTheme, navigate]);
 
