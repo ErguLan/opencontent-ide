@@ -1,11 +1,7 @@
 /**
- * ModelSelector
- * OpenContent IDE
- *
- * Shared model selector used in Landing and Workspace.
- * Lets users pick text, vision and image models from the registry.
+ * ModelSelector — user-driven model selection.
+ * OpenContent never auto-picks a vendor model.
  */
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
@@ -14,42 +10,35 @@ import { getTextModelOptions, getVisionModelOptions, getImageModelOptions } from
 import { ROUTES } from '../../config/constants';
 import './ModelSelector.css';
 
-function ModelSelector({
-    textModel,
-    visionModel,
-    imageModel,
-    onTextChange,
-    onVisionChange,
-    onImageChange,
-    onSave,
-    onCancel
-}) {
+const realModels = (items) => items.filter((model) => model?.id && !model.isPlaceholder);
+
+function ModelSelector({ textModel, visionModel, imageModel, onTextChange, onVisionChange, onImageChange, onSave, onCancel }) {
     const { t } = useLanguage();
     const navigate = useNavigate();
-    const [selectedText, setSelectedText] = useState(textModel);
-    const [selectedVision, setSelectedVision] = useState(visionModel);
-    const [selectedImage, setSelectedImage] = useState(imageModel);
+    const [selectedText, setSelectedText] = useState(textModel || '');
+    const [selectedVision, setSelectedVision] = useState(visionModel || '');
+    const [selectedImage, setSelectedImage] = useState(imageModel || '');
     const [textOptions, setTextOptions] = useState([]);
     const [visionOptions, setVisionOptions] = useState([]);
     const [imageOptions, setImageOptions] = useState([]);
 
     useEffect(() => {
-        setTextOptions(getTextModelOptions());
-        setVisionOptions(getVisionModelOptions());
-        setImageOptions(getImageModelOptions());
+        setTextOptions(realModels(getTextModelOptions()));
+        setVisionOptions(realModels(getVisionModelOptions()));
+        setImageOptions(realModels(getImageModelOptions()));
     }, []);
 
     useEffect(() => {
-        setSelectedText(textModel);
-        setSelectedVision(visionModel);
-        setSelectedImage(imageModel);
+        setSelectedText(textModel || '');
+        setSelectedVision(visionModel || '');
+        setSelectedImage(imageModel || '');
     }, [textModel, visionModel, imageModel]);
 
     const handleSave = () => {
-        onTextChange?.(selectedText);
-        onVisionChange?.(selectedVision);
-        onImageChange?.(selectedImage);
-        onSave?.(selectedText, selectedImage, selectedVision);
+        onTextChange?.(selectedText || null);
+        onVisionChange?.(selectedVision || null);
+        onImageChange?.(selectedImage || null);
+        onSave?.(selectedText || null, selectedImage || null, selectedVision || null);
     };
 
     const handleManageModels = () => {
@@ -57,91 +46,38 @@ function ModelSelector({
         navigate(ROUTES.SETTINGS);
     };
 
+    const renderSelect = (id, label, value, setValue, options) => (
+        <div className="oc-model-selector-block">
+            <label htmlFor={id} className="oc-model-selector-label">{label}</label>
+            <select id={id} className="oc-model-selector-select" value={value || ''} onChange={(event) => setValue(event.target.value)}>
+                <option value="">{t('workspace.model.noModelSelected')}</option>
+                {options.map((model) => (
+                    <option key={model.id} value={model.id}>
+                        {model.nickname || model.id} · {model.provider}
+                    </option>
+                ))}
+            </select>
+            <div className="oc-model-selector-meta">
+                {value ? <span className="oc-model-selector-id">{value}</span> : <span>{t('workspace.model.chooseExplicitly')}</span>}
+            </div>
+        </div>
+    );
+
     return (
         <div className="oc-model-selector">
-            <div className="oc-model-selector-block">
-                <label htmlFor="oc-text-model" className="oc-model-selector-label">
-                    {t('workspace.model.textLabel')}
-                </label>
-                <select
-                    id="oc-text-model"
-                    className="oc-model-selector-select"
-                    value={selectedText}
-                    onChange={(e) => setSelectedText(e.target.value)}
-                >
-                    {textOptions.length === 0 && (
-                        <option value="">{t('workspace.model.noModels')}</option>
-                    )}
-                    {textOptions.map((model) => (
-                        <option key={model.id} value={model.id}>
-                            {model.nickname}
-                        </option>
-                    ))}
-                </select>
-                <div className="oc-model-selector-meta">
-                    {selectedText && (
-                        <span className="oc-model-selector-id">{selectedText}</span>
-                    )}
-                </div>
-            </div>
+            {renderSelect('oc-text-model', t('workspace.model.textLabel'), selectedText, setSelectedText, textOptions)}
+            {renderSelect('oc-vision-model', t('workspace.model.visionLabel'), selectedVision, setSelectedVision, visionOptions)}
+            {renderSelect('oc-image-model', t('workspace.model.imageLabel'), selectedImage, setSelectedImage, imageOptions)}
 
-            <div className="oc-model-selector-block">
-                <label htmlFor="oc-vision-model" className="oc-model-selector-label">
-                    {t('workspace.model.visionLabel')}
-                </label>
-                <select
-                    id="oc-vision-model"
-                    className="oc-model-selector-select"
-                    value={selectedVision || ''}
-                    onChange={(e) => setSelectedVision(e.target.value)}
-                >
-                    <option value="">{t('workspace.model.noModelSelected')}</option>
-                    {visionOptions.map((model) => (
-                        <option key={model.id} value={model.id}>{model.nickname}</option>
-                    ))}
-                </select>
-                <div className="oc-model-selector-meta">
-                    {selectedVision && <span className="oc-model-selector-id">{selectedVision}</span>}
-                </div>
-            </div>
-
-            <div className="oc-model-selector-block">
-                <label htmlFor="oc-image-model" className="oc-model-selector-label">
-                    {t('workspace.model.imageLabel')}
-                </label>
-                <select
-                    id="oc-image-model"
-                    className="oc-model-selector-select"
-                    value={selectedImage}
-                    onChange={(e) => setSelectedImage(e.target.value)}
-                >
-                    {imageOptions.length === 0 && (
-                        <option value="">{t('workspace.model.noModels')}</option>
-                    )}
-                    {imageOptions.map((model) => (
-                        <option key={model.id} value={model.id}>
-                            {model.nickname}
-                        </option>
-                    ))}
-                </select>
-                <div className="oc-model-selector-meta">
-                    {selectedImage && (
-                        <span className="oc-model-selector-id">{selectedImage}</span>
-                    )}
-                </div>
-            </div>
+            {textOptions.length === 0 && imageOptions.length === 0 && visionOptions.length === 0 && (
+                <p className="oc-model-selector-meta">{t('landing.providerRequired')}</p>
+            )}
 
             <div className="oc-model-selector-actions">
-                <Button variant="secondary" onClick={handleManageModels}>
-                    {t('workspace.model.manageModels')}
-                </Button>
+                <Button variant="secondary" onClick={handleManageModels}>{t('workspace.model.manageModels')}</Button>
                 <div className="oc-model-selector-save-group">
-                    <Button variant="secondary" onClick={onCancel}>
-                        {t('common.cancel')}
-                    </Button>
-                    <Button variant="primary" onClick={handleSave}>
-                        {t('workspace.model.save')}
-                    </Button>
+                    <Button variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>
+                    <Button variant="primary" onClick={handleSave}>{t('workspace.model.save')}</Button>
                 </div>
             </div>
         </div>
