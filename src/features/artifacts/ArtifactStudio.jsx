@@ -2,9 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { ROUTES } from '../../config/constants';
-import { sendToAI, getActiveTextModel } from '../../services/ai';
+import { generateImage, getActiveImageModel, getActiveTextModel, sendToAI } from '../../services/ai';
+import { ensureGeneratedImagesHaveArtifacts, regenerateImageArtifact } from '../../services/imageArtifacts';
+import { IMAGE_ERROR_CODES, isImageArtifact, readImageArtifactAsset, readImageConfig } from '../../services/artifacts/imageArtifact';
 import {
     ARTIFACT_TYPES,
+    OPERATION_TYPES,
+    applyArtifactOperation,
     deleteArtifact,
     getArtifact,
     listArtifacts,
@@ -13,6 +17,7 @@ import {
     undoArtifact,
     redoArtifact
 } from '../../services/artifacts/artifactEngine';
+import { DELIVERY_STATES, describePendingReview, isTerminal, nextStates, resolveDeliveryState } from '../../services/delivery/deliveryState';
 import {
     addDiagramConnector,
     addDiagramNode,
@@ -41,6 +46,17 @@ import { applyAiArtifactOperations, planArtifactOperations } from '../../service
 import './ArtifactStudio.css';
 
 const TYPES = [ARTIFACT_TYPES.DIAGRAM, ARTIFACT_TYPES.DOCUMENT, ARTIFACT_TYPES.PDF];
+// Image artifacts are never created here: one cannot be made without an image
+// model and a provider call, so they arrive from the workspace. They are listed
+// and editable, which is why they belong to the filters and not to the create bar.
+const FILTER_TYPES = [...TYPES, ARTIFACT_TYPES.IMAGE];
+
+function downloadDataUrl(dataUrl, filename) {
+    const anchor = document.createElement('a');
+    anchor.href = dataUrl;
+    anchor.download = filename;
+    anchor.click();
+}
 
 function downloadText(content, filename, type) {
     const blob = new Blob([content], { type });
@@ -65,6 +81,12 @@ function relativeTime(value, language) {
     const hours = Math.round(minutes / 60);
     if (Math.abs(hours) < 24) return formatter.format(hours, 'hour');
     return formatter.format(Math.round(hours / 24), 'day');
+}
+
+function formatStamp(value, language) {
+    if (!value) return '';
+    try { return new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)); }
+    catch { return String(value); }
 }
 
 function operationSummary(operation, t) {
@@ -101,10 +123,20 @@ export default function ArtifactStudio() {
     const [drag, setDrag] = useState(null);
     const [query, setQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
+    const [deliveryError, setDeliveryError] = useState('');
+    const [imageAsset, setImageAsset] = useState(null);
+    const [imageError, setImageError] = useState('');
+    const [promptDraft, setPromptDraft] = useState('');
+    const [parametersDraft, setParametersDraft] = useState('{}');
+    const [parametersError, setParametersError] = useState('');
+    const [generating, setGenerating] = useState(false);
 
     const loadList = async () => {
-        const list = await listArtifacts();
-        setItems(list.sort((left, right) => new Date(right.updatedAt || right.createdAt) - new Date(left.updatedAt || left.createdAt)));
+        // Generated images stored before image artifacts existed get one here.
+        // The report carries the snapshot it read, so it replaces the query.
+        const backfill = await ensureGeneratedImagesHaveArtifacts();
+        const list = backfill.status === 'loaded' ? backfill.artifacts : await listArtifacts();
+        setItems([...list].sort((left, right) => new Date(right.updatedAt || right.createdAt) - new Date(left.updatedAt || left.createdAt)));
         return list;
     };
 
@@ -152,6 +184,37 @@ export default function ArtifactStudio() {
         }
     };
 
+    // An image artifact holds no bytes: it points at a media asset. The bytes are
+    // read from the asset that is already stored, never copied into the artifact.
+    const imageMediaAssetId = isImageArtifact(active) ? readImageConfig(active).mediaAssetId : null;
+
+    useEffect(() => {
+        if (!isImageArtifact(active)) {
+            setImageAsset(null);
+            setImageError('');
+            return undefined;
+        }
+        const config = readImageConfig(active);
+        setPromptDraft(config.prompt);
+        setParametersDraft(JSON.stringify(config.parameters, null, 2));
+        setParametersError('');
+        let cancelled = false;
+        readImageArtifactAsset(active)
+            .then((asset) => {
+                if (cancelled) return;
+                setImageAsset(asset);
+                setImageError('');
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                setImageAsset(null);
+                setImageError(error?.code || IMAGE_ERROR_CODES.ASSET_NOT_FOUND);
+            });
+        return () => { cancelled = true; };
+        // Re-read only when the artifact or the asset it references changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active?.id, imageMediaAssetId]);
+
     const filteredItems = useMemo(() => {
         const normalized = query.trim().toLowerCase();
         return items.filter((item) => {
@@ -164,6 +227,27 @@ export default function ArtifactStudio() {
     const page = useMemo(() => active?.content?.pages?.find((item) => item.id === selectedPageId) || active?.content?.pages?.[0] || null, [active, selectedPageId]);
     const node = useMemo(() => active?.content?.elements?.find((item) => item.id === selectedNode) || null, [active, selectedNode]);
 
+    const deliveryState = resolveDeliveryState(active?.delivery?.state);
+    const deliveryLabel = t(`delivery.states.${deliveryState}`);
+    const deliveryHistory = active?.delivery?.history || [];
+    const deliveryNext = nextStates(deliveryState);
+    const deliveryTerminal = isTerminal(deliveryState);
+    const deliveryPending = describePendingReview(active);
+
+    // A delivery change is an ordinary artifact operation: it goes through the
+    // operation log, is undoable, and is captured as a version like any edit.
+    const moveDelivery = async (state) => {
+        if (!active) return;
+        setDeliveryError('');
+        const stateLabel = t(`delivery.states.${state}`);
+        try {
+            const moved = applyArtifactOperation(active, { type: OPERATION_TYPES.SET_DELIVERY_STATE, state });
+            await persist(snapshotArtifact(moved, t('delivery.versionLabel', { state: stateLabel })), t('delivery.moved', { state: stateLabel }));
+        } catch (error) {
+            setDeliveryError(`${t('delivery.transitionFailed')} (${error?.code || 'DELIVERY_UNKNOWN_ERROR'})`);
+        }
+    };
+
     const createNew = async (type) => {
         const value = type === ARTIFACT_TYPES.DIAGRAM
             ? createDiagramArtifact({ name: t('artifactStudio.defaults.diagram') })
@@ -171,6 +255,61 @@ export default function ArtifactStudio() {
                 ? createPdfArtifact({ name: t('artifactStudio.defaults.pdf') })
                 : createDocumentArtifact({ name: t('artifactStudio.defaults.document') });
         await persist(value, t('artifactStudio.status.created'));
+    };
+
+    const imageErrorMessage = (error) => {
+        switch (error?.code) {
+            case IMAGE_ERROR_CODES.ASSET_NOT_FOUND: return t('imageArtifact.assetMissing');
+            case IMAGE_ERROR_CODES.PROMPT_REQUIRED: return t('imageArtifact.promptRequired');
+            case IMAGE_ERROR_CODES.PARAMETERS_INVALID: return t('imageArtifact.parametersInvalid');
+            case IMAGE_ERROR_CODES.GENERATOR_REQUIRED: return t('imageArtifact.noModel');
+            case IMAGE_ERROR_CODES.GENERATION_FAILED: return `${t('imageArtifact.generationFailed')} (${error.message})`;
+            default: return error?.message || t('ux.saveFailed');
+        }
+    };
+
+    // Regeneration is an ordinary artifact operation: the new bytes are stored,
+    // the previous ones stay reachable through undo, and the result is snapshotted
+    // so the previous state is also a labeled version.
+    const regenerateImage = async () => {
+        if (!active || !isImageArtifact(active)) return;
+        setParametersError('');
+        let parameters;
+        try {
+            parameters = parametersDraft.trim() ? JSON.parse(parametersDraft) : {};
+        } catch {
+            setParametersError(t('imageArtifact.parametersInvalid'));
+            return;
+        }
+        if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)) {
+            setParametersError(t('imageArtifact.parametersInvalid'));
+            return;
+        }
+        const model = getActiveImageModel();
+        if (!model) {
+            setStatus(t('imageArtifact.noModel'));
+            return;
+        }
+
+        setGenerating(true);
+        setStatus(t('imageArtifact.status.generating'));
+        try {
+            const result = await regenerateImageArtifact(active, {
+                prompt: promptDraft,
+                parameters,
+                model,
+                version: (active.versions?.length || 0) + 1,
+                generate: ({ prompt, parameters: nextParameters, model: nextModel, signal }) => generateImage(prompt, nextModel, { ...nextParameters, signal })
+            });
+            await persist(
+                snapshotArtifact(result.artifact, t('imageArtifact.versionLabel', { prompt: result.artifact.content.prompt })),
+                t('imageArtifact.status.applied')
+            );
+        } catch (error) {
+            setStatus(imageErrorMessage(error));
+        } finally {
+            setGenerating(false);
+        }
     };
 
     const importPdf = async (file) => {
@@ -189,6 +328,10 @@ export default function ArtifactStudio() {
 
     const exportActive = () => {
         if (!active) return;
+        if (isImageArtifact(active)) {
+            if (imageAsset?.data) downloadDataUrl(imageAsset.data, imageAsset.name || active.name);
+            return;
+        }
         if (active.type === ARTIFACT_TYPES.DIAGRAM) return downloadText(diagramToSvg(active), `${active.name}.svg`, 'image/svg+xml');
         if (active.type === ARTIFACT_TYPES.DOCUMENT) return downloadPdfBlob(serializeDocumentToPdf(active), active.name);
         if (active.content?.originalDataUrl) {
@@ -281,14 +424,18 @@ export default function ArtifactStudio() {
                     <input className="oc-artifact-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search…" aria-label="Search artifacts" />
                     <div className="oc-artifact-filters">
                         <button className={typeFilter === 'all' ? 'is-active' : ''} onClick={() => setTypeFilter('all')}>All</button>
-                        {TYPES.map((type) => <button key={type} className={typeFilter === type ? 'is-active' : ''} onClick={() => setTypeFilter(type)}>{t(`artifactStudio.types.${type}`)}</button>)}
+                        {FILTER_TYPES.map((type) => <button key={type} className={typeFilter === type ? 'is-active' : ''} onClick={() => setTypeFilter(type)}>{t(`artifactStudio.types.${type}`)}</button>)}
                     </div>
-                    {filteredItems.map((item) => (
-                        <button key={item.id} className={`oc-artifact-item ${active?.id === item.id ? 'is-active' : ''}`} onClick={() => openArtifact(item.id)}>
-                            <span>{item.name}</span>
-                            <small>{t(`artifactStudio.types.${item.type}`)} · {relativeTime(item.updatedAt || item.createdAt, language)}</small>
-                        </button>
-                    ))}
+                    {filteredItems.map((item) => {
+                        const itemState = resolveDeliveryState(item.delivery?.state);
+                        return (
+                            <button key={item.id} className={`oc-artifact-item ${active?.id === item.id ? 'is-active' : ''}`} onClick={() => openArtifact(item.id)}>
+                                <span>{item.name}</span>
+                                <span className={`oc-delivery-badge is-${itemState} is-compact`}>{t(`delivery.states.${itemState}`)}</span>
+                                <small>{t(`artifactStudio.types.${item.type}`)} · {relativeTime(item.updatedAt || item.createdAt, language)}</small>
+                            </button>
+                        );
+                    })}
                 </aside>
 
                 <main className="oc-artifact-main">
@@ -302,9 +449,123 @@ export default function ArtifactStudio() {
                                 {active.type === ARTIFACT_TYPES.PDF && <span className="oc-trust-badge">{t('ux.pdfOriginalProtected')}</span>}
                                 <button disabled={active.operationCursor < 0} onClick={() => persist(undoArtifact(active))}>{t('artifactStudio.undo')}</button>
                                 <button disabled={active.operationCursor >= (active.operations?.length || 0) - 1} onClick={() => persist(redoArtifact(active))}>{t('artifactStudio.redo')}</button>
-                                <button onClick={exportActive}>{active.type === ARTIFACT_TYPES.PDF ? t('ux.downloadOriginal') : t('artifactStudio.export')}</button>
+                                <button disabled={isImageArtifact(active) && !imageAsset} onClick={exportActive}>{active.type === ARTIFACT_TYPES.PDF ? t('ux.downloadOriginal') : t('artifactStudio.export')}</button>
                                 <button className="oc-danger-action" onClick={handleDelete}>{t('artifactStudio.delete')}</button>
                             </div>
+
+                            <section className="oc-delivery-panel" aria-labelledby="oc-delivery-heading">
+                                <div className="oc-delivery-head">
+                                    <h2 className="oc-delivery-heading" id="oc-delivery-heading">{t('delivery.sectionLabel')}</h2>
+                                    <span className={`oc-delivery-badge is-${deliveryState}`} aria-hidden="true">{deliveryLabel}</span>
+                                    <p className="oc-delivery-sr-only" role="status" aria-live="polite">{t('delivery.stateAnnouncement', { state: deliveryLabel })}</p>
+                                </div>
+
+                                {deliveryTerminal ? (
+                                    <div className="oc-delivery-terminal">
+                                        <strong>{t('delivery.terminalTitle')}</strong>
+                                        <span>{t('delivery.terminalDescription')}</span>
+                                    </div>
+                                ) : (
+                                    <div className="oc-delivery-actions" role="group" aria-label={t('delivery.sectionLabel')}>
+                                        {deliveryNext.map((state) => (
+                                            <button
+                                                key={state}
+                                                type="button"
+                                                aria-label={t('delivery.advanceTo', { state: t(`delivery.states.${state}`) })}
+                                                onClick={() => moveDelivery(state)}
+                                            >
+                                                {t('delivery.advanceTo', { state: t(`delivery.states.${state}`) })}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {deliveryPending && (
+                                    <p className="oc-delivery-pending">
+                                        <strong>{t('delivery.pendingReview')}</strong>
+                                        <span>{t('delivery.pendingReviewHint')}</span>
+                                    </p>
+                                )}
+                                {!deliveryPending && deliveryState !== DELIVERY_STATES.DRAFT && (
+                                    <p className="oc-delivery-clean">{t('delivery.cleanReviewHint')}</p>
+                                )}
+                                {deliveryError && <p className="oc-delivery-error" role="alert">{deliveryError}</p>}
+
+                                <details className="oc-delivery-history">
+                                    <summary>{t('delivery.history')}</summary>
+                                    {deliveryHistory.length === 0 ? (
+                                        <p className="oc-delivery-history-empty">{t('delivery.historyEmpty')}</p>
+                                    ) : (
+                                        <ol className="oc-delivery-history-list">
+                                            {deliveryHistory.map((entry, index) => (
+                                                <li
+                                                    key={`${entry.state}-${entry.at || index}`}
+                                                    className={index === deliveryHistory.length - 1 ? 'is-current' : ''}
+                                                    aria-label={t('delivery.historyEntry', { state: t(`delivery.states.${entry.state}`), at: formatStamp(entry.at, language) })}
+                                                >
+                                                    <span className="oc-delivery-history-state">{t(`delivery.states.${entry.state}`)}</span>
+                                                    {entry.at && <time dateTime={entry.at}>{formatStamp(entry.at, language)}</time>}
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    )}
+                                </details>
+                            </section>
+
+                            {isImageArtifact(active) && (
+                                <div className="oc-image-editor">
+                                    <div className="oc-image-canvas">
+                                        {imageAsset?.data ? <img className="oc-image-preview" src={imageAsset.data} alt={active.name} /> : (
+                                            imageError ? (
+                                                <div className="oc-artifact-empty">
+                                                    <h2>{t('imageArtifact.assetMissingTitle')}</h2>
+                                                    <p>{t('imageArtifact.assetMissingDescription', { code: imageError })}</p>
+                                                    <p>{t('imageArtifact.assetId', { id: imageMediaAssetId || '-' })}</p>
+                                                </div>
+                                            ) : (
+                                                <div className="oc-artifact-empty"><p>{t('imageArtifact.loading')}</p></div>
+                                            )
+                                        )}
+                                    </div>
+                                    <div className="oc-image-inspector">
+                                        <div className="oc-image-note">{t('imageArtifact.referenceNote')}</div>
+                                        <label className="oc-image-field">
+                                            <span>{t('imageArtifact.promptLabel')}</span>
+                                            <textarea value={promptDraft} onChange={(event) => setPromptDraft(event.target.value)} placeholder={t('imageArtifact.promptPlaceholder')} />
+                                        </label>
+                                        <small className="oc-image-hint">{t('imageArtifact.promptHint')}</small>
+                                        <label className="oc-image-field">
+                                            <span>{t('imageArtifact.parametersLabel')}</span>
+                                            <textarea className="oc-image-parameters" value={parametersDraft} onChange={(event) => { setParametersDraft(event.target.value); setParametersError(''); }} spellCheck="false" />
+                                        </label>
+                                        <small className="oc-image-hint">{t('imageArtifact.parametersHint')}</small>
+                                        {parametersError && <p className="oc-image-error" role="alert">{parametersError}</p>}
+                                        <button className="oc-image-regenerate" disabled={generating || Boolean(parametersError)} onClick={regenerateImage}>
+                                            {generating ? t('imageArtifact.regenerating') : t('imageArtifact.regenerate')}
+                                        </button>
+                                        <dl className="oc-image-meta">
+                                            <dt>{t('imageArtifact.assetLabel')}</dt><dd>{imageMediaAssetId || '-'}</dd>
+                                            <dt>{t('imageArtifact.modelLabel')}</dt><dd>{readImageConfig(active).model || '-'}</dd>
+                                            <dt>{t('imageArtifact.operationsLabel')}</dt><dd>{active.operations?.length || 0}</dd>
+                                        </dl>
+                                        <details className="oc-image-versions">
+                                            <summary>{t('imageArtifact.versionsLabel')}</summary>
+                                            {(active.versions || []).length === 0 ? (
+                                                <p className="oc-image-hint">{t('imageArtifact.versionsEmpty')}</p>
+                                            ) : (
+                                                <ol className="oc-image-versions-list">
+                                                    {active.versions.map((version, index) => (
+                                                        <li key={version.id || index}>
+                                                            <span>{version.label || t('imageArtifact.versionUnnamed')}</span>
+                                                            <time dateTime={version.createdAt}>{formatStamp(version.createdAt, language)}</time>
+                                                        </li>
+                                                    ))}
+                                                </ol>
+                                            )}
+                                        </details>
+                                    </div>
+                                </div>
+                            )}
 
                             {active.type === ARTIFACT_TYPES.DIAGRAM && (
                                 <div className="oc-diagram-editor">
@@ -355,7 +616,7 @@ export default function ArtifactStudio() {
                                         {(page?.blocks || []).map((block) => block.type === 'text' ? (
                                             <textarea key={block.id} className="oc-document-block" value={block.text} onChange={(event) => { setSaveState('saving'); setActive(updateBlock(active, page.id, block.id, { text: event.target.value })); }} onBlur={() => persist(active)} />
                                         ) : null)}
-                                        <button onClick={() => persist(addBlockToPage(active, page.id, createTextBlock({ text: t('artifactStudio.document.newText') }))}>{t('artifactStudio.document.addText')}</button>
+                                        <button onClick={() => persist(addBlockToPage(active, page.id, createTextBlock({ text: t('artifactStudio.document.newText') })))}>{t('artifactStudio.document.addText')}</button>
                                     </div>
                                 </div>
                             )}

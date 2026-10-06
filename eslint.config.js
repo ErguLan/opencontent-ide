@@ -5,7 +5,10 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
-    { ignores: ['dist', 'node_modules', 'server/node_modules'] },
+    // `writterart/` is a separate project nested in the repository, with its own
+    // package and conventions. It is not part of this app's source, so linting it
+    // here only reports failures the app cannot fix.
+    { ignores: ['dist', 'node_modules', 'server/node_modules', 'writterart/**'] },
     {
         files: ['**/*.{js,jsx}'],
         languageOptions: {

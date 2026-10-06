@@ -177,6 +177,48 @@ export async function generateImage(prompt, model, options = {}, retries = 3, de
     }
 }
 
+/**
+ * Lists the models available to the configured key.
+ * Google reports the resource name, display name, input token limit and the
+ * `supportedGenerationMethods` each model exposes. It does not declare
+ * modalities per model, so those stay null and the caller must not infer them.
+ */
+export async function listModels({ apiKey, baseUrl, signal } = {}) {
+    let key;
+    try {
+        key = getKey({ apiKey });
+    } catch {
+        return { success: false, error: 'API_KEY_NOT_CONFIGURED', reason: 'API_KEY_REQUIRED' };
+    }
+    const base = String(baseUrl || BASE_URL).replace(/\/$/, '');
+    try {
+        const response = await fetch(`${base}?key=${encodeURIComponent(key)}&pageSize=1000`, { signal });
+        if (!response.ok) {
+            return { success: false, status: response.status, error: await getErrorMessageFromResponse(response) };
+        }
+        const data = await response.json();
+        const entries = Array.isArray(data?.models) ? data.models : [];
+        return {
+            success: true,
+            models: entries
+                .map((entry) => ({
+                    id: typeof entry?.name === 'string' ? entry.name.replace(/^models\//, '') : '',
+                    displayName: typeof entry?.displayName === 'string' ? entry.displayName : null,
+                    ownedBy: null,
+                    contextWindow: Number.isFinite(entry?.inputTokenLimit) ? entry.inputTokenLimit : null,
+                    inputModalities: null,
+                    outputModalities: null,
+                    supportedGenerationMethods: Array.isArray(entry?.supportedGenerationMethods)
+                        ? entry.supportedGenerationMethods
+                        : null
+                }))
+                .filter((entry) => entry.id.trim())
+        };
+    } catch (error) {
+        return { success: false, error: normalizeError(error) };
+    }
+}
+
 export async function analyzeImage(imageUrl, prompt = 'Describe this image in detail', options = {}) {
     if (!options.visionModel) return { success: false, error: 'VISION_MODEL_NOT_SELECTED' };
     const result = await send(prompt, options.visionModel, {

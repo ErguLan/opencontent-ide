@@ -1,0 +1,249 @@
+/*
+ * Workspace UI pieces added by the workspace refactor.
+ * Every selector here is prefixed with `oc-` to avoid collisions.
+ */
+
+/* ========== SIDEBAR ========== */
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+}
+
+.project-open {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    padding: 0;
+}
+
+.project-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+/* ========== HEADER ========== */
+.user-avatar-small {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.user-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ========== STEP LOG ========== */
+.step-item.waiting {
+    opacity: 0.45;
+}
+
+.step-item.completed {
+    opacity: 0.8;
+}
+
+.step-item.failed {
+    opacity: 0.95;
+    border: 1px solid rgba(220, 80, 80, 0.45);
+}
+
+.step-item.skipped {
+    opacity: 0.55;
+    border: 1px dashed var(--color-border);
+}
+
+.step-item.completed .step-dot {
+    background-color: var(--color-text-primary);
+}
+
+.step-item.failed .step-dot {
+    background-color: #dc5050;
+}
+
+.step-item.skipped .step-dot {
+    background-color: transparent;
+    border: 1px solid var(--color-text-muted);
+}
+
+.step-pill.status-failed {
+    border-color: rgba(220, 80, 80, 0.5);
+}
+
+.step-pill.status-skipped {
+    opacity: 0.6;
+}
+
+/* ========== MEDIA PANEL ITEMS ========== */
+.media-item-open {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.media-item-open img {
+    width: 100%;
+    height: 56px;
+    object-fit: cover;
+    display: block;
+}
+
+.media-item-role,
+.media-item-use {
+    width: 100%;
+    font-size: 9px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 1px 4px;
+}
+
+.media-item-use.active {
+    color: var(--color-text-primary);
+    border-color: var(--color-text-muted);
+}
+
+.oc-media-drop-active {
+    outline: 1px dashed var(--color-text-muted);
+    outline-offset: 2px;
+}
+
+/* ========== PARTIAL FAILURE NOTICE ========== */
+.oc-partial-notice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-top: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid rgba(224, 168, 74, 0.45);
+    border-radius: var(--radius-md);
+    background-color: rgba(224, 168, 74, 0.08);
+}
+
+.oc-partial-notice-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.oc-partial-notice-list {
+    margin: 0;
+    padding-left: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.oc-partial-notice-step {
+    margin-right: var(--space-xs);
+    color: var(--color-text-muted);
+}
+
+/* ========== MODEL MODAL ========== */
+.oc-model-hint,
+.oc-model-count {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.oc-model-count {
+    margin-top: var(--space-sm);
+}
+
+/* ========== COPY AS API ========== */
+.oc-copy-api-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.oc-copy-api-tab {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border, #333);
+    background: var(--bg-secondary, #2a2a2a);
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.oc-copy-api-tab.is-active {
+    background: var(--color-primary, #7c3aed);
+    border-color: var(--color-primary, #7c3aed);
+    color: #fff;
+    font-weight: 600;
+}
+
+.oc-copy-api-snippet {
+    background: var(--bg-tertiary, #1a1a1a);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 300px;
+    color: var(--text-primary, #eee);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.oc-copy-api-action {
+    margin-top: 12px;
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--color-primary, #7c3aed);
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    width: 100%;
+}
+
+/* ========== COMPOSER FOOTER ========== */
+.oc-composer-footer {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    justify-content: flex-end;
+    align-items: center;
+}

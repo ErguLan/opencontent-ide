@@ -20,6 +20,8 @@
 ## Features
 
 - User-managed **Model Registry** with provider and capability tags.
+- **Model discovery with your own key** — OpenContent asks your provider which models your credentials can reach. No bundled catalog, and no fallback list when a provider cannot be listed.
+- Three-step AI setup at `/setup`: choose provider, paste credentials, discover and pick a model.
 - Text, vision and image generation through multiple providers.
 - **Streaming responses** for supported providers.
 - Skills/personas and project chat memory.
@@ -29,14 +31,16 @@
 - Editable document model + PDF export.
 - Imported PDFs preserve the original binary; OpenContent annotations currently live in a separate edit layer and are not silently embedded into the source PDF.
 - AI artifact changes are proposed as structured operations before they are applied.
-- Versioned artifact operations with Undo/Redo foundations.
-- Browser CLI at `/cli` with plugins and autocomplete.
+- Versioned artifact operations with Undo/Redo.
+- **Delivery states** for media and artifacts: `draft -> in-review -> approved -> published`, with a terminal published state.
+- Unified **Library** with kind filters and delivery-state filters.
+- Browser CLI at `/cli` with plugins, suggestions and local history.
 - Standalone Node.js CLI with one-shot/script mode and interactive shell.
 - REST API and OpenAI-compatible chat endpoint.
 - MCP tool provider.
 - Hook-based plugin system.
-- Dark/light mode, EN/ES i18n, Docker and PWA support.
-- Optional Rust/WASM `oc-core` for deterministic artifact operations.
+- Dark/light mode, EN/ES i18n, Docker and a PWA manifest/service worker.
+- Deterministic in-browser validation for every AI artifact operation before it is applied.
 
 ## Quick start
 
@@ -49,14 +53,15 @@ npm run dev
 
 Open `http://localhost:5173`.
 
-Then open **Settings** and:
+Then open **Setup** (`/setup`), which walks through three steps:
 
-1. Add a provider/API key or configure a local/custom provider.
-2. Register the exact model IDs you want to use.
-3. Mark their capabilities (`text`, `vision`, `imageGeneration`, tools, etc.).
-4. Explicitly choose active text/vision/image models when needed.
+1. Choose a provider.
+2. Paste your credentials. Keys are stored in this browser's localStorage only — nothing is sent anywhere by OpenContent itself.
+3. Discover the models your key can reach and choose one. If the provider cannot be listed, or listing fails, you can type the model ID by hand.
 
-OpenContent does not pick a default GPT, Gemini, Seedream or any other vendor model for you.
+You can also register models manually in **Settings**, tagging their capabilities (`text`, `vision`, `imageGeneration`, tools, etc.) and explicitly choosing the active text/vision/image models.
+
+OpenContent does not pick a model for you. The registry starts empty and stays that way until you fill it.
 
 ## Local inference with Ollama
 
@@ -86,9 +91,26 @@ Each artifact has an addressable route:
 /artifacts/<artifact-id>
 ```
 
+Every artifact operation, including a delivery-state change, goes through the same operation log: it is versioned and undoable like any other edit.
+
 For imported PDFs, the UI intentionally says **Download original** until OpenContent can embed the edit layer into a newly rendered PDF. This avoids implying that annotations have modified the source binary when they have not.
 
 See [docs/system/ARTIFACTS.md](docs/system/ARTIFACTS.md).
+
+## Delivery states
+
+A piece of content is not finished when it is generated. OpenContent tracks that lifecycle explicitly:
+
+```text
+draft -> in-review -> approved -> published
+```
+
+- Transitions only move forward. No jumps, no skips, no going back.
+- `published` is terminal. To change a published piece, create a new version of it.
+- For artifacts the transition is a normal, undoable artifact operation. For media assets it is the asset `status`, validated by the same machine.
+- Artifact Studio shows a delivery panel; the Library filters media and artifacts by delivery state, including a "needs review" view.
+
+See [docs/system/DELIVERY.md](docs/system/DELIVERY.md).
 
 ## Browser CLI
 
@@ -106,6 +128,8 @@ document
 generate
 agent
 ```
+
+`artifact`, `diagram` and `document` come from the built-in artifact plugin; the rest are built into the CLI engine.
 
 Destructive browser-CLI operations require explicit `--force` where supported.
 
@@ -190,42 +214,33 @@ The MCP layer is designed so agents can generate/inspect content and artifacts w
 
 ## Providers
 
-| Provider | Text | Images | Local | Notes |
-| --- | --- | --- | --- | --- |
-| OpenRouter | Yes | Model-dependent | No | BYOK |
-| OpenAI | Yes | Yes | No | BYOK |
-| Google | Yes | Model-dependent | No | BYOK |
-| Anthropic | Yes | No | No | BYOK |
-| Ollama | Yes | Model-dependent | Yes | User-managed local models |
-| Custom OpenAI-compatible | Capability-dependent | Capability-dependent | Depends | User-supplied base URL |
+| Provider | Text | Images | Local | Model listing | Notes |
+| --- | --- | --- | --- | --- | --- |
+| OpenRouter | Yes | Model-dependent | No | Yes | BYOK |
+| OpenAI | Yes | Yes | No | Yes | BYOK |
+| Google | Yes | Model-dependent | No | Yes, paginated | BYOK |
+| Anthropic | Yes | No | No | Yes, paginated | BYOK |
+| Ollama | Yes | Model-dependent | Yes | Yes | User-managed local models |
+| Custom OpenAI-compatible | Capability-dependent | Capability-dependent | Depends | Reported as unsupported | User-supplied base URL |
 
 Capabilities are determined by the model records the user registers; OpenContent intentionally avoids shipping a vendor model catalog as a source of implicit defaults.
+
+See [docs/system/AI_PROVIDERS.md](docs/system/AI_PROVIDERS.md) and [docs/system/MODEL_REGISTRY.md](docs/system/MODEL_REGISTRY.md).
 
 ## Storage and privacy
 
 Browser mode uses:
 
-- IndexedDB for projects/media/artifacts.
+- One IndexedDB database, `OpenContentDB`, holding the `projects`, `user-assets` and `artifacts` stores.
 - localStorage for preferences, model registry and BYOK configuration.
 
-“Local-first” describes OpenContent storage. Inference is only fully local when the selected provider/infrastructure is local; using a hosted provider sends the requested inference data to that provider.
+Data written by earlier versions is migrated on first run from the previous per-domain databases and from the legacy `oc_local_projects` key. The migration only removes a legacy source after every record has been committed, so an interrupted migration retries instead of losing data.
 
-## Rust / WASM core
+"Local-first" describes OpenContent storage. Inference is only fully local when the selected provider/infrastructure is local; using a hosted provider sends the requested inference data to that provider.
 
-The optional deterministic core lives under:
+## Deterministic validation
 
-```text
-rust/oc-core
-```
-
-Run:
-
-```bash
-npm run rust:check
-npm run rust:test
-```
-
-The frontend can use the WASM build when present and fall back to JavaScript validation when it is not built.
+AI artifact operations are validated in JavaScript, in the browser, before they can touch an artifact. The planner only emits actions from a fixed allowlist, and every operation is type-checked against the action it claims to be. There is no native build step and no optional backend required for validation to work.
 
 ## Development
 
@@ -239,13 +254,28 @@ npm run build
 Main project areas:
 
 ```text
-src/       React/Vite frontend
-server/    optional Express API
-cli/       standalone Node CLI
-mcp/       MCP providers
-rust/      deterministic Rust/WASM core
-docs/      architecture and system docs
+src/        React/Vite frontend
+  components/  shared UI primitives, icons, command palette
+  config/      constants, routes, storage keys
+  context/     auth, language, theme providers
+  data/        skills and quick prompts
+  features/    landing, workspace, setup, settings, library, gallery, artifacts, cli, auth
+  i18n/        translation tree (en/es + artifact/ux modules)
+  plugins/     plugin manager and built-in plugins
+  services/    ai, artifacts, db, delivery, models, providers
+  test/        test setup and the in-memory IndexedDB double
+server/     optional Express API
+cli/        standalone Node CLI
+mcp/        MCP providers
+docs/       architecture, roadmap, translation system, per-system docs
+public/     icons, PWA manifest, service worker
 ```
+
+## Known limitations
+
+- Imported PDF annotations are kept in a separate edit layer and are not written back into the original PDF binary.
+- `index.html` and the PWA files reference `/brand/*` assets (favicon, install icons) that are not present in the repository, so install icons and service-worker pre-caching are incomplete.
+- The API server's `/api/health` response reports a fixed version string that does not track `package.json`.
 
 ## Contributing
 
@@ -253,7 +283,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md).
+[docs/ROADMAP.md](docs/ROADMAP.md) is a planning document. Treat its items as plan, not as shipped features; the sections above describe what the code does today.
 
 ## License
 

@@ -1,32 +1,27 @@
 /**
  * Media Service (IndexedDB)
  * OpenContent IDE
- * 
+ *
  * Manages local storage for high-quality images without hitting LocalStorage limits (5MB)
  * Uses IndexedDB to store Blobs/Base64 locally.
+ *
+ * Data lives in the unified `OpenContentDB` (`user-assets` store). The public
+ * API of this module is unchanged.
+ *
+ * The `status` field of an asset is its delivery state (draft, in-review,
+ * approved, published), not a job status. Legacy assets written before the
+ * delivery model existed carry values such as `completed`; those are read and
+ * written as `draft` so nothing breaks and nothing lies about the asset.
  */
 
-const DB_NAME = 'OpenContentMediaDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'user-assets';
+import { MEDIA_STORE } from './db/schema.js';
+import { ensureDatabaseReady } from './db/migration.js';
+import { add, count, deleteRecord, get, getAll, withTransaction } from './db/access.js';
+import { resolveDeliveryState, validateTransition } from './delivery/deliveryState.js';
 
-/**
- * Initializes the IndexedDB database
- */
-const initDB = () => {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            }
-        };
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+const withDb = async (work) => {
+    await ensureDatabaseReady();
+    return work();
 };
 
 /**
@@ -36,7 +31,6 @@ const initDB = () => {
  * @returns {Promise<object>} Saved asset info
  */
 export const saveMedia = async (file, name, options = {}) => {
-    const db = await initDB();
     const id = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     // Convert to Base64 for easier preview and API handling
@@ -57,7 +51,7 @@ export const saveMedia = async (file, name, options = {}) => {
         prompt: options.prompt || null,
         parameters: options.parameters || {},
         version: options.version || null,
-        status: options.status || 'completed',
+        status: resolveDeliveryState(options.status),
         comments: options.comments || [],
         referenceAssetIds: Array.isArray(options.referenceAssetIds) ? options.referenceAssetIds : [],
         location: options.location || 'project',
@@ -65,101 +59,76 @@ export const saveMedia = async (file, name, options = {}) => {
         createdAt: new Date().toISOString()
     };
 
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.add(asset);
+    await withDb(() => add(MEDIA_STORE, asset));
 
-        request.onsuccess = () => resolve(asset);
-        request.onerror = () => reject(request.error);
-    });
+    return asset;
 };
 
 /**
  * Retrieves all saved assets
  */
 export const getAllMedia = async () => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.getAll();
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+    return withDb(() => getAll(MEDIA_STORE));
 };
 
 /**
  * Deletes an asset by ID
  */
 export const deleteMedia = async (id) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.delete(id);
-
-        request.onsuccess = () => resolve(true);
-        request.onerror = () => reject(request.error);
-    });
+    return withDb(() => deleteRecord(MEDIA_STORE, id));
 };
 
 export const getMedia = async (id) => {
     if (!id) return null;
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readonly');
-        const request = transaction.objectStore(STORE_NAME).get(id);
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-    });
+    const record = await withDb(() => get(MEDIA_STORE, id));
+    return record || null;
 };
 
 /**
  * Updates metadata for an existing asset
+ *
+ * `updates.status` is the delivery state of the asset and follows the same
+ * state machine as artifacts: forward transitions only, `published` is
+ * terminal. An illegal move rejects and leaves the stored asset untouched.
  */
 export const updateMediaMetadata = async (id, updates = {}) => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const getRequest = store.get(id);
+    return withDb(() => withTransaction(MEDIA_STORE, 'readwrite', async (stores) => {
+        const store = stores[MEDIA_STORE];
 
-        getRequest.onerror = () => reject(getRequest.error);
-        getRequest.onsuccess = () => {
-            const current = getRequest.result;
-            if (!current) {
-                resolve(null);
-                return;
-            }
+        const current = await new Promise((resolve, reject) => {
+            const getRequest = store.get(id);
+            getRequest.onsuccess = () => resolve(getRequest.result);
+            getRequest.onerror = () => reject(getRequest.error);
+        });
 
-            const nextAsset = {
-                ...current,
-                ...updates,
-                updatedAt: new Date().toISOString()
-            };
+        if (!current) return null;
 
-            const putRequest = store.put(nextAsset);
-            putRequest.onsuccess = () => resolve(nextAsset);
-            putRequest.onerror = () => reject(putRequest.error);
+        const nextUpdates = { ...updates };
+        if (Object.prototype.hasOwnProperty.call(nextUpdates, 'status')) {
+            validateTransition(resolveDeliveryState(current.status), nextUpdates.status);
+        }
+
+        const nextAsset = {
+            ...current,
+            ...nextUpdates,
+            updatedAt: new Date().toISOString()
         };
-    });
+
+        await new Promise((resolve, reject) => {
+            const putRequest = store.put(nextAsset);
+            putRequest.onsuccess = () => resolve();
+            putRequest.onerror = () => reject(putRequest.error);
+        });
+
+        return nextAsset;
+    }));
 };
 
 /**
  * Counts total saved assets
  */
 export const countMedia = async () => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.count();
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+    return withDb(() => count(MEDIA_STORE));
 };
 
 /**

@@ -10,6 +10,9 @@ import { getErrorMessageFromResponse, normalizeError } from './shared.js';
 import { appendAnthropicToolContext } from './toolContext.js';
 
 const BASE_URL = 'https://api.anthropic.com/v1/messages';
+const MODELS_URL = 'https://api.anthropic.com/v1/models';
+const PAGE_SIZE = 100;
+const MAX_LIST_PAGES = 10;
 
 function getKey(config) {
     const key = config?.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('oc_k_an') : '') || import.meta.env.VITE_ANTHROPIC_API_KEY || '';
@@ -120,6 +123,58 @@ export async function send(prompt, model, options = {}, retries = 3, delay = 200
 
 export async function generateImage() {
     return { success: false, error: 'IMAGE_GENERATION_NOT_SUPPORTED' };
+}
+
+/**
+ * Lists the models available to the configured key.
+ * Anthropic paginates the endpoint, so pages are followed until the API
+ * stops reporting more. The listing exposes no image or context data, so
+ * those fields stay null rather than being invented.
+ */
+export async function listModels({ apiKey, baseUrl, signal } = {}) {
+    let key;
+    try {
+        key = getKey({ apiKey });
+    } catch {
+        return { success: false, error: 'API_KEY_NOT_CONFIGURED', reason: 'API_KEY_REQUIRED' };
+    }
+    const base = String(baseUrl || MODELS_URL).replace(/\/$/, '');
+    const models = [];
+    let afterId = null;
+    try {
+        for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+            const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
+            if (afterId) query.set('after_id', afterId);
+            const response = await fetch(`${base}?${query.toString()}`, {
+                headers: {
+                    'x-api-key': key,
+                    'anthropic-version': '2023-06-01'
+                },
+                signal
+            });
+            if (!response.ok) {
+                return { success: false, status: response.status, error: await getErrorMessageFromResponse(response) };
+            }
+            const data = await response.json();
+            const entries = Array.isArray(data?.data) ? data.data : [];
+            models.push(...entries
+                .map((entry) => ({
+                    id: typeof entry?.id === 'string' ? entry.id : '',
+                    displayName: typeof entry?.display_name === 'string' ? entry.display_name : null,
+                    ownedBy: null,
+                    contextWindow: null,
+                    inputModalities: null,
+                    outputModalities: null
+                }))
+                .filter((entry) => entry.id.trim()));
+            const lastId = typeof data?.last_id === 'string' ? data.last_id : null;
+            if (!data?.has_more || !lastId || lastId === afterId) break;
+            afterId = lastId;
+        }
+        return { success: true, models };
+    } catch (error) {
+        return { success: false, error: normalizeError(error) };
+    }
 }
 
 export async function analyzeImage(imageUrl, prompt = 'Describe this image in detail', options = {}) {

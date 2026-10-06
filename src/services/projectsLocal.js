@@ -1,179 +1,71 @@
 /**
  * Projects Local Service (IndexedDB)
  * Stores all projects locally to avoid cloud dependency.
+ *
+ * Data lives in the unified `OpenContentDB` (`projects` store). The public API
+ * of this module is unchanged: the legacy databases are migrated by the db
+ * layer on first use.
  */
 
-const DB_NAME = 'OpenContentProjectsDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'projects';
-const LEGACY_STORAGE_KEY = 'oc_local_projects';
-
-const safeParseProjects = (raw) => {
-    if (!raw) return [];
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
-};
-
-const sortByUpdatedAtDesc = (items) => {
-    return [...items].sort((a, b) => {
-        const aTime = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
-        const bTime = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
-        return bTime - aTime;
-    });
-};
-
-const uniqueById = (items) => {
-    const map = new Map();
-    for (const item of items) {
-        if (!item || !item.id) continue;
-        const existing = map.get(item.id);
-        if (!existing) {
-            map.set(item.id, item);
-            continue;
-        }
-
-        const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-        const incomingTime = new Date(item.updatedAt || item.createdAt || 0).getTime();
-        if (incomingTime >= existingTime) {
-            map.set(item.id, item);
-        }
-    }
-    return Array.from(map.values());
-};
-
-const openDb = () => {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            }
-        };
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-};
-
-const txDone = (tx) => {
-    return new Promise((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-        tx.onabort = () => reject(tx.error);
-    });
-};
-
-const migrateLegacyLocalStorageIfNeeded = async (db) => {
-    const tx = db.transaction([STORE_NAME], 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-
-    const count = await new Promise((resolve, reject) => {
-        const req = store.count();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-    await txDone(tx);
-
-    if (count > 0) return;
-
-    const legacyProjects = safeParseProjects(localStorage.getItem(LEGACY_STORAGE_KEY));
-    if (legacyProjects.length === 0) return;
-
-    const writeTx = db.transaction([STORE_NAME], 'readwrite');
-    const writeStore = writeTx.objectStore(STORE_NAME);
-    uniqueById(legacyProjects).forEach((project) => {
-        if (project?.id) writeStore.put(project);
-    });
-    await txDone(writeTx);
-
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
-};
+import { PROJECTS_STORE } from './db/schema.js';
+import { ensureDatabaseReady } from './db/migration.js';
+import { deleteRecord, get, getAll, withTransaction } from './db/access.js';
+import { dedupeById, normalizeRecord, sortByUpdatedAtDesc } from './db/records.js';
 
 const withDb = async (work) => {
-    const db = await openDb();
-    await migrateLegacyLocalStorageIfNeeded(db);
-    return work(db);
+    await ensureDatabaseReady();
+    return work();
 };
 
 export const getLocalProjects = async () => {
-    return withDb((db) => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([STORE_NAME], 'readonly');
-            const store = tx.objectStore(STORE_NAME);
-            const req = store.getAll();
-
-            req.onsuccess = () => resolve(sortByUpdatedAtDesc(uniqueById(req.result || [])));
-            req.onerror = () => reject(req.error);
-        });
+    return withDb(async () => {
+        const records = await getAll(PROJECTS_STORE);
+        return sortByUpdatedAtDesc(dedupeById(records).records);
     });
 };
 
 export const getLocalProject = async (projectId) => {
     if (!projectId) return null;
 
-    return withDb((db) => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([STORE_NAME], 'readonly');
-            const store = tx.objectStore(STORE_NAME);
-            const req = store.get(projectId);
-
-            req.onsuccess = () => resolve(req.result || null);
-            req.onerror = () => reject(req.error);
-        });
+    return withDb(async () => {
+        const record = await get(PROJECTS_STORE, projectId);
+        return record || null;
     });
 };
 
 export const saveLocalProject = async (project) => {
     if (!project) return null;
 
-    return withDb((db) => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([STORE_NAME], 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const projectId = project.id || `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-            let savedProject = null;
+    return withDb(() => withTransaction(PROJECTS_STORE, 'readwrite', async (stores) => {
+        const store = stores[PROJECTS_STORE];
+        const projectId = project.id || `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-            tx.oncomplete = () => resolve(savedProject);
-            tx.onerror = () => reject(tx.error);
-            tx.onabort = () => reject(tx.error || new Error('PROJECT_SAVE_ABORTED'));
-
+        const existing = await new Promise((resolve, reject) => {
             const getReq = store.get(projectId);
+            getReq.onsuccess = () => resolve(getReq.result || null);
             getReq.onerror = () => reject(getReq.error);
-            getReq.onsuccess = () => {
-                const existing = getReq.result;
-                savedProject = {
-                    ...(existing || {}),
-                    ...project,
-                    id: projectId,
-                    createdAt: existing?.createdAt || project.createdAt || new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                };
-
-                const putReq = store.put(savedProject);
-                putReq.onerror = () => reject(putReq.error);
-            };
         });
-    });
+
+        const savedProject = {
+            ...(existing || {}),
+            ...project,
+            id: projectId,
+            createdAt: existing?.createdAt || project.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        await new Promise((resolve, reject) => {
+            const putReq = store.put(normalizeRecord(savedProject));
+            putReq.onsuccess = () => resolve();
+            putReq.onerror = () => reject(putReq.error);
+        });
+
+        return savedProject;
+    }));
 };
 
 export const deleteLocalProject = async (projectId) => {
     if (!projectId) return false;
 
-    return withDb((db) => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([STORE_NAME], 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const req = store.delete(projectId);
-            tx.oncomplete = () => resolve(true);
-            tx.onabort = () => reject(tx.error || new Error('PROJECT_DELETE_ABORTED'));
-            tx.onerror = () => reject(tx.error);
-            req.onerror = () => reject(req.error);
-        });
-    });
+    return withDb(() => deleteRecord(PROJECTS_STORE, projectId));
 };

@@ -11,7 +11,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import Icon, { ICONS } from '../../components/icons/Icon';
 import Button from '../../components/common/Button';
-import { PLANS, STORAGE_KEYS, REPO_URL } from '../../config/constants';
+import { APP_VERSION, PLANS, STORAGE_KEYS, REPO_URL } from '../../config/constants';
 import {
     AI_CONFIG,
     SKILLS,
@@ -996,7 +996,7 @@ function Settings() {
                                 <Icon src={ICONS.LOGO} size={48} />
                             </div>
                             <span className="about-name">OpenContent IDE</span>
-                            <span className="about-version">v{import.meta.env.VITE_APP_VERSION || '0.1.0'}</span>
+                            <span className="about-version">v{APP_VERSION}</span>
                             <span className="about-powered">{t('settings.about.donatedBy')}</span>
                             <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="about-link">
                                 {REPO_URL}

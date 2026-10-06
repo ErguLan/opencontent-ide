@@ -61,4 +61,16 @@ describe('Model Registry', () => {
         expect(supportsVision('vision-model')).toBe(true);
         expect(supportsVision('non-existing-model')).toBe(false);
     });
+
+    it('refuses a model with no capability, because it could never be selected', () => {
+        let error = null;
+        try {
+            addModel({ id: 'dead/model', provider: PROVIDERS.OPENROUTER, capabilities: {} });
+        } catch (caught) {
+            error = caught;
+        }
+        expect(error).toBeTruthy();
+        expect(error.code).toBe('MODEL_CAPABILITIES_REQUIRED');
+        expect(getStoredModels().length).toBe(0);
+    });
 });

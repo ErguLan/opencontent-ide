@@ -3,15 +3,36 @@
  * OpenContent IDE
  */
 
+import { version as APP_PACKAGE_VERSION } from '../../package.json';
+
 // App info
 export const APP_NAME = import.meta.env.VITE_APP_NAME || 'OpenContent IDE';
-export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.0';
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION || APP_PACKAGE_VERSION;
 export const REPO_URL = 'https://github.com/ErguLan/opencontent-ide';
 
 // Feature flags
 export const ENABLE_USAGE_LIMITS = import.meta.env.VITE_ENABLE_USAGE_LIMITS === 'true';
 export const CLI_ENABLED = import.meta.env.VITE_CLI_ENABLED !== 'false';
 export const CLI_ACCESS = import.meta.env.VITE_CLI_ACCESS || 'public'; // 'public' | 'local_only' | 'disabled'
+
+// Desktop integration ("open in an external IDE"), contract version 1.
+//
+// This is configuration, not branding: a fork declares the URL scheme the
+// operating system has registered for its own desktop application, plus the
+// name it wants the interface to show. Nothing is hardcoded here on purpose, and
+// with no values the integration reports itself as not configured and the
+// interface disables the action instead of producing a link that opens nothing.
+//
+// It is read through a function so the resolved value is observable where it is
+// used, rather than being frozen at module evaluation.
+const readEnvText = (value) => (typeof value === 'string' ? value.trim() : '');
+export function getExternalIdeIntegration() {
+    return Object.freeze({
+        scheme: readEnvText(import.meta.env.VITE_EXTERNAL_IDE_SCHEME),
+        appName: readEnvText(import.meta.env.VITE_EXTERNAL_IDE_APP_NAME),
+        helpUrl: readEnvText(import.meta.env.VITE_EXTERNAL_IDE_HELP_URL)
+    });
+}
 
 // Routes
 export const ROUTES = {

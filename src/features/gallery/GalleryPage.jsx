@@ -162,7 +162,7 @@ export default function GalleryPage() {
                                 <span>{previewAsset.kind || 'asset'}</span>
                                 {previewAsset.model && <span>{previewAsset.model}</span>}
                                 {previewAsset.version && <span>v{previewAsset.version}</span>}
-                                {previewAsset.status && <span>{previewAsset.status}</span>}
+                                {previewAsset.status && <span>{t(`delivery.states.${previewAsset.status}`)}</span>}
                             </div>
                         </div>
                     </div>

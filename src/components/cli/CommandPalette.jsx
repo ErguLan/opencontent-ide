@@ -78,7 +78,13 @@ function CommandPalette({ isOpen, onClose, commands = [] }) {
         } else if (event.key === 'Escape') onClose();
     };
 
-    let previousCategory = null;
+    const categoryStartIndexes = new Set();
+    allCommands.forEach((command, index) => {
+        if (command.category && allCommands[index - 1]?.category !== command.category) {
+            categoryStartIndexes.add(index);
+        }
+    });
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={t('cli.title')} className="oc-command-palette-modal">
             <div className="oc-command-palette">
@@ -100,26 +106,22 @@ function CommandPalette({ isOpen, onClose, commands = [] }) {
                 </div>
                 <div id="oc-command-palette-list" className="oc-command-palette-list" role="listbox">
                     {allCommands.length === 0 && <div className="oc-command-palette-empty">{t('cli.noResults')}</div>}
-                    {allCommands.map((command, index) => {
-                        const showCategory = command.category && command.category !== previousCategory;
-                        previousCategory = command.category;
-                        return (
-                            <div key={command.id} className="oc-command-palette-entry">
-                                {showCategory && <div className="oc-command-palette-category">{t(`cliUx.category.${command.category}`)}</div>}
-                                <button
-                                    type="button"
-                                    role="option"
-                                    aria-selected={index === selectedIndex}
-                                    className={`oc-command-palette-item ${index === selectedIndex ? 'selected' : ''}`}
-                                    onClick={() => execute(command)}
-                                    onMouseEnter={() => setSelectedIndex(index)}
-                                >
-                                    <span className="oc-command-palette-label">{command.label}</span>
-                                    {command.shortcut && <span className="oc-command-palette-shortcut">{command.shortcut}</span>}
-                                </button>
-                            </div>
-                        );
-                    })}
+                    {allCommands.map((command, index) => (
+                        <div key={command.id} className="oc-command-palette-entry">
+                            {categoryStartIndexes.has(index) && <div className="oc-command-palette-category">{t(`cliUx.category.${command.category}`)}</div>}
+                            <button
+                                type="button"
+                                role="option"
+                                aria-selected={index === selectedIndex}
+                                className={`oc-command-palette-item ${index === selectedIndex ? 'selected' : ''}`}
+                                onClick={() => execute(command)}
+                                onMouseEnter={() => setSelectedIndex(index)}
+                            >
+                                <span className="oc-command-palette-label">{command.label}</span>
+                                {command.shortcut && <span className="oc-command-palette-shortcut">{command.shortcut}</span>}
+                            </button>
+                        </div>
+                    ))}
                 </div>
                 <div className="oc-command-palette-footer">Ctrl/⌘ K · ↑↓ · Enter · Esc</div>
             </div>

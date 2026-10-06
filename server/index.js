@@ -1,5 +1,5 @@
-/**
- * OpenContent IDE — API Server
+﻿/**
+ * OpenContent IDE - API Server
  */
 import express from 'express';
 import cors from 'cors';
@@ -13,6 +13,10 @@ import sessionsRoute from './routes/sessions.js';
 import clientConfigRoute from './routes/clientConfig.js';
 import { agenticRoute } from './routes/agentic.js';
 import artifactsRoute from './routes/artifacts.js';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { version: APP_VERSION } = require('../package.json');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -20,7 +24,7 @@ const DEBUG_LOGS = process.env.OC_DEBUG_LOGS === 'true';
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => { const startedAt = Date.now(); res.on('finish', () => { if (DEBUG_LOGS) console.error(`[server] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${Date.now() - startedAt}ms`); }); next(); });
-app.get('/api/health', (_req, res) => { res.json({ status:'ok',name:'OpenContent IDE API',version:'0.1.0',providers:{ openrouter:!!process.env.OPENROUTER_API_KEY,openai:!!process.env.OPENAI_API_KEY,gemini:!!process.env.GOOGLE_API_KEY,anthropic:!!process.env.ANTHROPIC_API_KEY,ollama:!!process.env.OLLAMA_BASE_URL },debugLogs:DEBUG_LOGS,artifactEngine:true }); });
+app.get('/api/health', (_req, res) => { res.json({ status:'ok',name:'OpenContent IDE API',version:APP_VERSION,providers:{ openrouter:!!process.env.OPENROUTER_API_KEY,openai:!!process.env.OPENAI_API_KEY,gemini:!!process.env.GOOGLE_API_KEY,anthropic:!!process.env.ANTHROPIC_API_KEY,ollama:!!process.env.OLLAMA_BASE_URL },debugLogs:DEBUG_LOGS,artifactEngine:true }); });
 app.use('/api', generateRoute);
 app.use('/api', imagesRoute);
 app.use('/api', modelsRoute);

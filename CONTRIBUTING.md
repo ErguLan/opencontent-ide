@@ -25,15 +25,17 @@ Thanks for your interest in contributing!
 src/
   config/          — Constants, feature flags, routes, storage keys
   context/         — React contexts (Auth, Theme, Language)
-  features/        — Page components (Landing, Workspace, Settings, Auth, CLI)
+  features/        — Page components (Landing, Workspace, Artifact Studio, Library, Setup, Settings, Auth, CLI)
     workspace/
-      hooks/       — useWorkspaceAI, useWorkspaceMedia, useWorkspaceProjects
+      hooks/       — useAgentRun, useModelSelection, useWorkspaceGeneration, useWorkspaceResults, useWorkspaceMedia, useWorkspaceProjects
       components/  — MediaPanel, ChatInput, WorkspaceCanvas, etc.
     cli/           — CliEngine, commands, CliPage, useCli
   components/      — Shared UI (Button, Modal, Icon, ModelSelector, CommandPalette)
   services/
+    db/            — Single IndexedDB layer (OpenContentDB) plus legacy migration
+    delivery/      — Delivery state machine for content lifecycle
     providers/     — One module per AI provider (openrouter, openai, google, anthropic, ollama)
-    models/        — Model registry and custom-model helpers
+    models/        — Model registry, model discovery and custom-model helpers
     ai/            — Unified provider dispatch
     projectsLocal, mediaService, copyAsApi, freemium, metrics
   i18n/            — Translation JSON files (en.json, es.json)
@@ -58,12 +60,16 @@ To add a new provider:
 
 ## Model Registry
 
-Models are stored in localStorage. There are no built-in defaults — users add their own via Settings.
+Models are stored in localStorage. There are no built-in defaults and no vendor catalog is bundled — users register their own through the `/setup` flow, which discovers available models by asking the user's provider with the user's own key (`discoverProviderModels`). `isBuiltIn` is always `false`.
 
 - `getStoredModels()` — returns all models
 - `addModel(model)` — adds a custom model
-- `resolveModel(id)` — looks up by ID, falls back to generic OpenRouter model
+- `addModelsFromDiscovery(entries, { provider, capabilities })` — batch registration from discovery
+- `resolveModel(id)` — looks up by ID. An unknown ID stays **unconfigured** (`provider: null`, all capabilities `false`); it never falls back to another provider's model
+- `discoverProviderModels({ provider, apiKey, baseUrl, signal })` — asks the user's provider which models their key can reach
 - `supportsVision(id)` / `supportsImageGeneration(id)` — capability checks
+
+Never auto-select a model on the user's behalf. The unselected placeholder is located by its marker, never by its position in the list, so reordering the registry cannot silently activate a model. `src/services/ai/modelSelection.test.js` locks this invariant.
 
 Run `npm test` to verify model operations.
 

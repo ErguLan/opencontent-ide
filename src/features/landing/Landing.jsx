@@ -43,7 +43,7 @@ function Landing() {
     const [selectedImageModel, setSelectedImageModel] = useState(() => getActiveImageModel());
     const inputRef = useRef(null);
 
-    const textModels = useMemo(() => getTextModelOptions().filter((model) => model.id), [showModelModal]);
+    const textModels = useMemo(() => getTextModelOptions().filter((model) => model.id), []);
     const activeTextLabel = textModels.find((model) => model.id === selectedTextModel)?.nickname || selectedTextModel || t('workspace.model.noModelSelected');
     const configured = isAIConfigured();
 

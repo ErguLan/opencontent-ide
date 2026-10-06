@@ -3,6 +3,8 @@ import { ROUTES } from '../../config/constants.js';
 import { ARTIFACT_TYPES, deleteArtifact, listArtifacts, saveArtifact } from '../../services/artifacts/artifactEngine.js';
 import { createDiagramArtifact, diagramToSvg, parseDiagramDsl } from '../../services/artifacts/diagramEngine.js';
 import { createDocumentArtifact, documentFromText, serializeDocumentToPdf } from '../../services/artifacts/pdfEngine.js';
+import { imageMediaAssetId } from '../../services/artifacts/imageArtifact.js';
+import { getMedia } from '../../services/mediaService.js';
 import { getActiveTextModel, sendToAI } from '../../services/ai/index.js';
 
 function download(content, filename, type) {
@@ -67,6 +69,12 @@ export default {
                     if (action === 'export') {
                         if (artifact.type === ARTIFACT_TYPES.DIAGRAM) download(diagramToSvg(artifact), `${artifact.name}.svg`, 'image/svg+xml');
                         else if (artifact.type === ARTIFACT_TYPES.DOCUMENT) download(serializeDocumentToPdf(artifact), `${artifact.name}.pdf`, 'application/pdf');
+                        else if (artifact.type === ARTIFACT_TYPES.IMAGE) {
+                            // An image artifact holds a reference: the bytes are in the media asset.
+                            const asset = await getMedia(imageMediaAssetId(artifact));
+                            if (!asset?.data) return { type: 'error', message: 'This image artifact references a media asset that no longer exists.' };
+                            download(asset.data, asset.name || `${artifact.name}.png`, asset.type);
+                        }
                         else return { type: 'info', message: 'Imported PDFs keep their original binary. Use Artifact Studio to download the original.' };
                         return { type: 'success', message: `Exported ${artifact.name}` };
                     }

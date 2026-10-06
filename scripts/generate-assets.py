@@ -88,6 +88,19 @@ def generate_pngs() -> None:
     print(f"Generated {OUTPUT_DIR / 'favicon.ico'}")
 
 
+OG_SIZE = (1200, 630)
+
+
+def generate_og_image() -> None:
+    """Social preview image. Referenced by index.html, so it must exist."""
+    width, height = OG_SIZE
+    img = Image.new("RGB", OG_SIZE, COLORS["bg"])
+    mark = draw_logo(220)
+    img.paste(mark, ((width - 220) // 2, (height - 220) // 2 - 40), mark)
+    img.save(OUTPUT_DIR / "og-image.png", "PNG")
+    print(f"Generated {OUTPUT_DIR / 'og-image.png'}")
+
+
 def generate_svgs() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -101,4 +114,5 @@ def generate_svgs() -> None:
 
 if __name__ == "__main__":
     generate_pngs()
+    generate_og_image()
     generate_svgs()

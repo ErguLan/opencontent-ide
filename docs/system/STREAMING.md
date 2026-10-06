@@ -2,23 +2,23 @@
 
 ## Overview
 
-Streaming allows the AI response to appear **character by character** as it's generated, rather than all at once after completion. This provides a better user experience, especially for long responses.
+Streaming lets a text response appear chunk by chunk as it is generated, instead of only after the request completes.
 
 ## Architecture
 
-The streaming system has three layers:
+Three layers:
 
 ```
-1. Provider → SSE parser → chunks
-2. AI Service → passes onChunk callback
-3. UI Hook → updates displayedText reactively
+1. Provider module -> streaming.js SSE parser -> chunks
+2. AI service      -> forwards options.stream and options.onChunk
+3. Workspace hooks -> onChunk updates the displayed text reactively
 ```
 
 ## Provider Layer (`src/services/providers/streaming.js`)
 
 ### `readOpenAIStream(response)`
 
-An **async generator** that parses a fetch `Response` body as Server-Sent Events (SSE):
+An **async generator** that parses a `fetch` `Response` body as Server-Sent Events:
 
 ```
 data: {"choices":[{"delta":{"content":"Hello"}}]}
@@ -26,75 +26,36 @@ data: {"choices":[{"delta":{"content":" world"}}]}
 data: [DONE]
 ```
 
-Yields the `delta.content` string for each chunk.
+It yields each `delta.content` string, stops on `[DONE]`, ignores blank lines and malformed JSON, and releases the reader in a `finally` block.
 
 ### `createStreamAccumulator()`
 
-A helper that accumulates chunks into the full response:
-
 ```js
 const acc = createStreamAccumulator();
-acc.append("Hello");   // → "Hello"
-acc.append(" world");  // → "Hello world"
-acc.getContent();      // → "Hello world"
+acc.append("Hello");   // -> "Hello"
+acc.append(" world");  // -> "Hello world"
+acc.getContent();      // -> "Hello world"
 ```
 
 ## Provider Integration
 
-In `openrouter.js` and `openai.js`:
+`openrouter.js` and `openai.js` both branch on `options.stream`:
 
 ```js
-export async function send(prompt, model, options = {}) {
-    const stream = Boolean(options.stream);
-    const body = { model, messages, stream, ... };
-
-    const response = await fetch(url, { method: 'POST', body: JSON.stringify(body) });
-
-    if (stream) {
-        const accumulator = createStreamAccumulator();
-        for await (const chunk of readOpenAIStream(response)) {
-            accumulator.append(chunk);
-            options.onChunk?.(chunk, accumulator.getContent());
-        }
-        return { success: true, content: accumulator.getContent(), model };
+if (stream) {
+    const accumulator = createStreamAccumulator();
+    for await (const chunk of readOpenAIStream(response)) {
+        accumulator.append(chunk);
+        options.onChunk?.(chunk, accumulator.getContent());
     }
-
-    // Non-streaming: normal JSON parse
-    const data = await response.json();
-    return { success: true, content: data.choices[0].message.content, model };
+    return { success: true, content: accumulator.getContent(), model, usage: {} };
 }
+
+// Non-streaming: one JSON parse
+const data = await response.json();
 ```
 
-## UI Layer (`useWorkspaceAI.js`)
-
-The hook checks `isStreamingEnabled()` from localStorage and passes `stream` + `onChunk` to `sendToAI`:
-
-```js
-const stream = isStreamingEnabled();
-wasStreamedRef.current = stream;
-const response = await sendToAI(fullPrompt, selectedTextModel, {
-    stream,
-    onChunk: stream ? (_chunk, accumulated) => setDisplayedText(accumulated) : undefined
-});
-```
-
-When streaming is active:
-- `setDisplayedText(accumulated)` is called on every chunk
-- The typewriter effect is **skipped** after the response (text is already displayed)
-- `wasStreamedRef.current` prevents double-rendering
-
-## Enabling Streaming
-
-Streaming is opt-in via a localStorage flag:
-
-```js
-import { isStreamingEnabled, setStreamingEnabled } from '../../services/ai';
-
-setStreamingEnabled(true);  // Enable
-setStreamingEnabled(false); // Disable
-```
-
-It defaults to **disabled**. Users enable it in Settings or via the CLI (`streaming on`).
+The streaming branch returns the same `{ success, content, model }` shape as the non-streaming branch, so a caller does not branch on how the text arrived. Both `openai.js` and `openrouter.js` also retry on HTTP 429 with exponential backoff (3 retries, 2 s base delay) before falling through.
 
 ## Supported Providers
 
@@ -102,6 +63,60 @@ It defaults to **disabled**. Users enable it in Settings or via the CLI (`stream
 |----------|-----------|-------|
 | OpenRouter | Yes | OpenAI-compatible SSE |
 | OpenAI | Yes | OpenAI-compatible SSE |
-| Google Gemini | No | Uses non-streaming fallback |
-| Anthropic Claude | No | Uses non-streaming fallback |
-| Ollama | No | Uses non-streaming fallback |
+| Google Gemini | No | Non-streaming request |
+| Anthropic | No | Non-streaming request |
+| Ollama | No | Sends `stream: false` |
+| Custom (OpenAI-compatible) | No | Sends `stream: false` |
+
+## Who Actually Streams
+
+This is the part that is easy to get wrong, so it is stated explicitly.
+
+**Agentic text steps stream.** `runTextStep` in `src/services/ai/agenticPipeline.js` sets `stream: true` unconditionally and forwards chunks:
+
+```js
+const result = await sendToAI(contextualTaskPrompt, selectedTextModel, {
+    systemPrompt: ..., signal, stream: true,
+    onChunk: (_chunk, accumulated) => onChunk?.(accumulated)
+});
+```
+
+**Direct (non-agentic) generation does not stream.** `useWorkspaceGeneration` calls `sendToAI` without `stream`, waits for the complete response and lets the reveal be a presentation effect.
+
+The pipeline's own closing `sendToAI` calls (the native tool loop and the final summary after fallback tool actions) also do not pass `stream`.
+
+## UI Layer
+
+`onChunk` is wired to `agentRun.setDisplayedText`:
+
+| Consumer | Wiring |
+|----------|--------|
+| `useWorkspaceGeneration` (agentic run) | `onChunk: agentRun.setDisplayedText` |
+| `useWorkspaceBatch` | `onChunk: agentRun.setDisplayedText` |
+| `features/cli/commands.js` (`agent` command) | `onChunk: () => {}` |
+
+`setDisplayedText` lives in `useAgentRun`; the text is rendered by the canvas.
+
+## The Typewriter Reveal
+
+`useWorkspaceResults` owns the reveal of a completed text result, at a 5 ms interval per character. It only runs when all of the following hold:
+
+- The agent state is `COMPLETE`.
+- The current version is of type `text`.
+- The version is flagged `isNew`.
+- That version index has not been revealed before (`lastTypedVersionRef`).
+
+When a streamed run is showing, the streamed text is already on screen; the typewriter path is what covers the non-streamed case, and re-revealing an already-revealed version writes the stored text directly.
+
+## The Opt-in Flag Is Not Wired
+
+`services/ai/index.js` exports:
+
+```js
+isStreamingEnabled()   // localStorage 'oc_streaming_enabled' === 'true'
+setStreamingEnabled(enabled)
+```
+
+and `STORAGE_KEYS.STREAMING_ENABLED` (`oc_streaming_enabled`) exists in `src/config/constants.js`.
+
+No code in `src/` reads `isStreamingEnabled()`, there is no Settings toggle, and there is no CLI command that calls `setStreamingEnabled()`. The functions and the key are currently dead code. Consequence: **agentic text steps always attempt to stream**, and there is no user-facing way to turn streaming off. Wiring the flag into the pipeline (and into Settings) is a pending change, not a feature that exists.

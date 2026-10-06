@@ -155,6 +155,15 @@ export function isAIConfigured() {
     return getStoredModels().some((model) => model.capabilities?.text && providerConfigured(model));
 }
 
+/**
+ * Whether the app can actually produce an image right now. `isAIConfigured()`
+ * only looks at text models, so without this the workspace claims to be ready
+ * and then fails mid-request when a visual step is reached.
+ */
+export function isImageGenerationConfigured() {
+    return getStoredModels().some((model) => model.capabilities?.imageGeneration && providerConfigured(model));
+}
+
 export function getAvailableProviders() {
     const configured = new Set();
     for (const model of getStoredModels()) {
@@ -236,6 +245,7 @@ export default {
     IMAGE_MODEL_CATALOG,
     SKILLS,
     isAIConfigured,
+    isImageGenerationConfigured,
     isOllamaConfigured,
     getAvailableProviders,
     getTextModelOptions,

@@ -94,13 +94,83 @@ export async function analyzeImage(imageUrl, prompt = 'Describe this image in de
     return { success: true, analysis: result.content, model: result.model };
 }
 
-export async function listModels(config = {}) {
-    const baseUrl = getBaseUrl(config);
+/**
+ * `/api/tags` lists names but not capabilities. `/api/show` answers per model
+ * with `capabilities` (completion, vision, tools, embedding, insert), so that
+ * is what the detection reads. A model whose probe fails simply reports
+ * nothing, which is the honest answer rather than a guess.
+ */
+const SHOW_CONCURRENCY = 6;
+
+async function fetchModelCapabilities(base, name, signal) {
     try {
-        const response = await fetch(`${baseUrl}/api/tags`);
-        if (!response.ok) throw new Error('Connection failed');
+        const response = await fetch(`${base}/api/show`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: name }),
+            signal
+        });
+        if (!response.ok) return null;
         const data = await response.json();
-        return (data.models || []).map((m) => m.name || m.model);
+        return Array.isArray(data?.capabilities)
+            ? data.capabilities.filter((value) => typeof value === 'string' && value.trim())
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+async function mapWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let cursor = 0;
+    const runners = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+        while (cursor < items.length) {
+            const index = cursor;
+            cursor += 1;
+            results[index] = await worker(items[index]);
+        }
+    });
+    await Promise.all(runners);
+    return results;
+}
+
+/**
+ * Lists the models the local endpoint has pulled.
+ * Ollama reports the model name and family on `/api/tags`, and the real
+ * capabilities on `/api/show`, which is queried for every listed model.
+ */
+export async function listModels({ baseUrl, signal } = {}) {
+    const base = String(getBaseUrl({ baseUrl }) || '').replace(/\/$/, '');
+    if (!base) return { success: false, error: 'BASE_URL_NOT_CONFIGURED', reason: 'BASE_URL_REQUIRED' };
+    try {
+        const response = await fetch(`${base}/api/tags`, { signal });
+        if (!response.ok) {
+            return { success: false, status: response.status, error: await getErrorMessageFromResponse(response) };
+        }
+        const data = await response.json();
+        const entries = Array.isArray(data?.models) ? data.models : [];
+        const names = entries
+            .map((entry) => (typeof entry?.name === 'string' ? entry.name : entry?.model))
+            .filter((name) => typeof name === 'string' && name.trim());
+        const probed = await mapWithConcurrency(names, SHOW_CONCURRENCY, (name) => fetchModelCapabilities(base, name, signal));
+        const capabilitiesByName = new Map(names.map((name, index) => [name, probed[index]]));
+        return {
+            success: true,
+            models: entries
+                .map((entry) => {
+                    const name = typeof entry?.name === 'string' ? entry.name : entry?.model;
+                    return {
+                        id: name,
+                        displayName: null,
+                        ownedBy: typeof entry?.details?.family === 'string' ? entry.details.family : null,
+                        contextWindow: null,
+                        inputModalities: null,
+                        outputModalities: null,
+                        capabilities: capabilitiesByName.get(name) || null
+                    };
+                })
+                .filter((entry) => typeof entry.id === 'string' && entry.id.trim())
+        };
     } catch (error) {
         return { success: false, error: normalizeError(error) };
     }

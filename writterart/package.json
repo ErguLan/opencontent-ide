@@ -1,0 +1,41 @@
+{
+  "name": "writterart",
+  "version": "0.1.0",
+  "description": "Deterministic scene descriptions for agents. Not an image generator: a compiler.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./mcp": "./src/mcp/server.js"
+  },
+  "bin": {
+    "wrt": "./src/cli.js"
+  },
+  "files": [
+    "src",
+    "examples",
+    "schemas",
+    "docs"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "spec": "node src/cli.js spec",
+    "validate": "node src/cli.js validate",
+    "render": "node src/cli.js render"
+  },
+  "keywords": [
+    "scene-description",
+    "dsl",
+    "deterministic",
+    "svg",
+    "agents",
+    "mcp"
+  ],
+  "dependencies": {},
+  "devDependencies": {}
+}

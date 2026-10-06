@@ -1,6 +1,6 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
- * OpenContent IDE — MCP Tool Provider
+ * OpenContent IDE - MCP Tool Provider
  * 
  * Exposes OpenContent IDE capabilities as MCP tools so that
  * AI agents (Claude, Gemini, etc.) can use it as a content generation tool.
@@ -20,9 +20,13 @@
 import { createInterface } from 'readline';
 import { mkdir, readdir, stat, writeFile, copyFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { sendToProvider, generateImageProvider } from '../server/lib/providers.js';
 import { runAgenticCycle } from '../server/lib/agentic.js';
 import { EDITOR_CONTEXT } from '../server/lib/editorContext.js';
+
+const require = createRequire(import.meta.url);
+const { version: pkgVersion } = require('./package.json');
 
 // Config from env
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
@@ -537,7 +541,7 @@ rl.on('line', async (line) => {
                 result: {
                     protocolVersion: '2024-11-05',
                     capabilities: { tools: {} },
-                    serverInfo: { name: 'opencontent-ide', version: '0.1.0' }
+                    serverInfo: { name: 'opencontent-ide', version: pkgVersion }
                 }
             });
             break;

@@ -1,34 +1,33 @@
 /**
- * CopyAsApiModal — Shows API snippets for the current prompt
- * OpenContent IDE
+ * CopyAsApiModal — API snippets for the current prompt.
  */
+
 import { useState } from 'react';
-import { useLanguage } from '../../../context/LanguageContext';
 import Modal from '../../../components/common/Modal';
 import {
+    copyToClipboard,
     generateCurlCommand,
     generateFetchSnippet,
-    generatePythonSnippet,
     generateLocalServerSnippet,
-    copyToClipboard
+    generatePythonSnippet
 } from '../../../services/copyAsApi';
 
-function CopyAsApiModal({ isOpen, onClose, prompt, model }) {
-    const { t } = useLanguage();
+const TABS = Object.freeze([
+    { id: 'curl', labelKey: 'workspace.copyAsApi.curl' },
+    { id: 'fetch', labelKey: 'workspace.copyAsApi.javascript' },
+    { id: 'python', labelKey: 'workspace.copyAsApi.python' },
+    { id: 'local', labelKey: 'workspace.copyAsApi.localServer' }
+]);
+
+const COPIED_RESET_MS = 2000;
+
+function CopyAsApiModal({ isOpen, onClose, prompt, model, t }) {
     const [activeTab, setActiveTab] = useState('curl');
     const [copied, setCopied] = useState(false);
 
     if (!isOpen) return null;
 
     const params = { prompt: prompt || '', model };
-
-    const tabs = [
-        { id: 'curl', label: t('workspace.copyAsApi.curl') },
-        { id: 'fetch', label: t('workspace.copyAsApi.javascript') },
-        { id: 'python', label: t('workspace.copyAsApi.python') },
-        { id: 'local', label: t('workspace.copyAsApi.localServer') }
-    ];
-
     const snippets = {
         curl: generateCurlCommand(params),
         fetch: generateFetchSnippet(params),
@@ -39,64 +38,28 @@ function CopyAsApiModal({ isOpen, onClose, prompt, model }) {
     const handleCopy = async () => {
         await copyToClipboard(snippets[activeTab]);
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        window.setTimeout(() => setCopied(false), COPIED_RESET_MS);
     };
 
     return (
-        <Modal open={isOpen} onClose={onClose} title={t('workspace.copyAsApi.title')}>
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                {tabs.map(tab => (
+        <Modal isOpen={isOpen} onClose={onClose} title={t('workspace.copyAsApi.title')}>
+            <div className="oc-copy-api-tabs">
+                {TABS.map((tab) => (
                     <button
                         key={tab.id}
                         type="button"
+                        className={`oc-copy-api-tab ${activeTab === tab.id ? 'is-active' : ''}`}
                         onClick={() => { setActiveTab(tab.id); setCopied(false); }}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            background: activeTab === tab.id ? 'var(--color-primary, #7c3aed)' : 'var(--bg-secondary, #2a2a2a)',
-                            color: activeTab === tab.id ? '#fff' : 'var(--text-secondary, #aaa)',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            fontWeight: activeTab === tab.id ? 600 : 400
-                        }}
+                        aria-pressed={activeTab === tab.id}
                     >
-                        {tab.label}
+                        {t(tab.labelKey)}
                     </button>
                 ))}
             </div>
 
-            <pre style={{
-                background: 'var(--bg-tertiary, #1a1a1a)',
-                padding: '12px',
-                borderRadius: '8px',
-                overflowX: 'auto',
-                fontSize: '12px',
-                lineHeight: '1.5',
-                maxHeight: '300px',
-                color: 'var(--text-primary, #eee)',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word'
-            }}>
-                {snippets[activeTab]}
-            </pre>
+            <pre className="oc-copy-api-snippet">{snippets[activeTab]}</pre>
 
-            <button
-                type="button"
-                onClick={handleCopy}
-                style={{
-                    marginTop: '12px',
-                    padding: '8px 20px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: copied ? '#22c55e' : 'var(--color-primary, #7c3aed)',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    width: '100%'
-                }}
-            >
+            <button type="button" className="oc-copy-api-action" onClick={handleCopy}>
                 {copied ? t('workspace.copyAsApi.copied') : t('workspace.copyAsApi.copy')}
             </button>
         </Modal>

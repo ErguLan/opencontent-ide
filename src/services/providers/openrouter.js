@@ -137,6 +137,63 @@ export async function send(prompt, model, options = {}, retries = 3, delay = 200
     }
 }
 
+/**
+ * Dedicated image models must be called through the images endpoint. Sending one
+ * to `/chat/completions` makes OpenRouter reject it with a 404, because that
+ * endpoint only serves chat models that can emit an image as a modality.
+ */
+async function generateImageViaImagesEndpoint(apiKey, model, options, enhancedPrompt) {
+    const response = await fetchWithTimeout(`${BASE_URL}/images/generations`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://opencontent-ide.github.io',
+            'X-Title': 'OpenContent IDE'
+        },
+        body: JSON.stringify({
+            model,
+            prompt: enhancedPrompt,
+            size: options.size || '1024x1024',
+            n: 1
+        }),
+        signal: options.signal
+    });
+    if (!response.ok) {
+        return { success: false, status: response.status, error: await getErrorMessageFromResponse(response) };
+    }
+    const data = await response.json();
+    const imageUrl = extractImageFromOpenRouterData(data);
+    if (!imageUrl) return { success: false, error: 'NO_IMAGE_IN_RESPONSE' };
+    return { success: true, imageUrl, model, transport: 'images-endpoint' };
+}
+
+/** Chat models that emit an image as a modality, via `/chat/completions`. */
+async function generateImageViaChatEndpoint(apiKey, model, options, enhancedPrompt) {
+    const response = await fetchWithTimeout(`${BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://opencontent-ide.github.io',
+            'X-Title': 'OpenContent IDE'
+        },
+        body: JSON.stringify({
+            model,
+            modalities: ['image'],
+            messages: [{ role: 'user', content: enhancedPrompt }]
+        }),
+        signal: options.signal
+    });
+    if (!response.ok) {
+        return { success: false, status: response.status, error: await getErrorMessageFromResponse(response) };
+    }
+    const data = await response.json();
+    const imageUrl = extractImageFromOpenRouterData(data);
+    if (!imageUrl) return { success: false, error: 'NO_IMAGE_IN_RESPONSE' };
+    return { success: true, imageUrl, model, transport: 'chat-endpoint' };
+}
+
 export async function generateImage(prompt, model, options = {}, retries = 3, delay = 2000) {
     const apiKey = getKey(options);
     const size = options.size || '1024x1024';
@@ -147,35 +204,66 @@ export async function generateImage(prompt, model, options = {}, retries = 3, de
         ? `${prompt}\n\nStyle: ${style}, quality: ${quality}, size: ${size}.\nExclude: ${negPrompt}`
         : `${prompt}\n\nStyle: ${style}, quality: ${quality}, size: ${size}.`;
 
+    // The images endpoint is the canonical path for a model the user registered
+    // as an image model. Chat completions stays as the fallback for multimodal
+    // chat models that only emit images through the `image` modality.
+    const primary = await generateImageViaImagesEndpoint(apiKey, model, options, enhancedPrompt);
+    if (primary.success) return primary;
+
+    const fallback = await generateImageViaChatEndpoint(apiKey, model, options, enhancedPrompt);
+    if (fallback.success) return fallback;
+
+    if (fallback.status === 429 && retries > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return generateImage(prompt, model, options, retries - 1, delay * 2);
+    }
+    return { success: false, error: normalizeError(new Error(fallback.error || primary.error || 'IMAGE_GENERATION_FAILED')) };
+}
+
+/**
+ * Lists the models available to the configured key.
+ * OpenRouter reports real modality and context data per model, so those
+ * values are forwarded as-is instead of being guessed.
+ */
+export async function listModels({ apiKey, baseUrl, signal } = {}) {
+    let key;
     try {
-        const response = await fetchWithTimeout(`${BASE_URL}/chat/completions`, {
-            method: 'POST',
+        key = getKey({ apiKey });
+    } catch {
+        return { success: false, error: 'API_KEY_NOT_CONFIGURED', reason: 'API_KEY_REQUIRED' };
+    }
+    const base = String(baseUrl || BASE_URL).replace(/\/$/, '');
+    try {
+        const response = await fetch(`${base}/models`, {
             headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
+                Authorization: `Bearer ${key}`,
                 'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://opencontent-ide.github.io',
                 'X-Title': 'OpenContent IDE'
             },
-            body: JSON.stringify({
-                model,
-                modalities: ['image'],
-                messages: [{ role: 'user', content: enhancedPrompt }]
-            }),
-            signal: options.signal
+            signal
         });
-
-        if (response.status === 429 && retries > 0) {
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            return generateImage(prompt, model, options, retries - 1, delay * 2);
-        }
         if (!response.ok) {
-            const msg = await getErrorMessageFromResponse(response);
-            throw new Error(msg);
+            return { success: false, status: response.status, error: await getErrorMessageFromResponse(response) };
         }
         const data = await response.json();
-        const imageUrl = extractImageFromOpenRouterData(data);
-        if (imageUrl) return { success: true, imageUrl, model };
-        return { success: false, error: 'NO_IMAGE_IN_RESPONSE' };
+        const entries = Array.isArray(data?.data) ? data.data : [];
+        return {
+            success: true,
+            models: entries
+                .map((entry) => {
+                    const id = typeof entry?.id === 'string' ? entry.id : '';
+                    const architecture = entry?.architecture || null;
+                    return {
+                        id,
+                        displayName: typeof entry?.name === 'string' ? entry.name : null,
+                        ownedBy: id.includes('/') ? id.split('/')[0] : null,
+                        contextWindow: Number.isFinite(entry?.context_length) ? entry.context_length : null,
+                        inputModalities: Array.isArray(architecture?.input_modalities) ? architecture.input_modalities : null,
+                        outputModalities: Array.isArray(architecture?.output_modalities) ? architecture.output_modalities : null
+                    };
+                })
+                .filter((entry) => entry.id.trim())
+        };
     } catch (error) {
         return { success: false, error: normalizeError(error) };
     }

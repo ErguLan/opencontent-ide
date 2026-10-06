@@ -1,0 +1,114 @@
+/* Open in an external desktop editor */
+
+.oc-open-in-ide {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+}
+
+.oc-open-in-ide-status {
+    color: var(--color-text-secondary);
+}
+
+.oc-open-in-ide-exported {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-xs);
+    color: var(--color-text-primary);
+}
+
+.oc-open-in-ide-blocked {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+}
+
+.oc-open-in-ide-code {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.oc-open-in-ide-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.oc-open-in-ide-label,
+.oc-open-in-ide-linklabel {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.oc-open-in-ide-input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.oc-open-in-ide-hint,
+.oc-open-in-ide-note {
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.oc-open-in-ide-error {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: #dc2626;
+}
+
+.oc-open-in-ide-link {
+    display: block;
+    padding: var(--space-sm);
+    border-radius: 8px;
+    background: var(--color-bg-tertiary);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    color: var(--color-text-primary);
+    overflow-x: auto;
+    word-break: break-all;
+}
+
+.oc-open-in-ide-action {
+    padding: 8px 20px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-accent);
+    color: var(--color-accent-text);
+    text-align: center;
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.oc-open-in-ide-copy {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.oc-open-in-ide-help {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    text-decoration: underline;
+}

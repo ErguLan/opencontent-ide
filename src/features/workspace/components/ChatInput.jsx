@@ -1,116 +1,209 @@
 /**
- * ChatInput — Chat form with attachments & task mode.
+ * ChatInput — the single composer of the workspace.
+ *
+ * One component owns both the first prompt and every later iteration, so the
+ * keyboard behaviour, the attachments, the task mode switch and the model
+ * selector are identical everywhere:
+ *   Enter        send (or stop the running request)
+ *   Shift+Enter  new line
  */
+
+import { useCallback, useRef } from 'react';
 import Icon, { ICONS } from '../../../components/icons/Icon';
+import Loader from '../../../components/common/Loader';
 import './ChatInputUx.css';
 
+const MAX_COMPOSER_HEIGHT = 160;
+
 function ChatInput({
-    chatInput, onChatInputChange, onSubmit,
-    isWorking, isIterating, isGenerating,
-    creativeTaskMode, onTaskModeChange,
-    attachedMedia, onRemoveAttach,
-    activeAssetIds, mediaAssets,
-    chatFileInputRef, onAttachFile,
-    selectedTextModel,
-    onShowModelModal, isPro, onShowProModal,
-    getTextModelLabel, getAssetRoleLabel,
-    onAbort, t
+    value,
+    onChange,
+    onSubmit,
+    onStop,
+    isWorking,
+    isIterating,
+    showIterationStatus = true,
+    disableModelGate = false,
+    creativeTaskMode,
+    onTaskModeChange,
+    attachedMedia,
+    onRemoveAttachment,
+    activeAssets,
+    onToggleActiveAsset,
+    onPickAttachment,
+    modelLabel,
+    onShowModelModal,
+    hasTextModel,
+    isPro,
+    onShowProModal,
+    footer,
+    t
 }) {
-    const ensureModel = () => {
-        if (selectedTextModel) return true;
-        onShowModelModal?.();
-        return false;
-    };
+    const textareaRef = useRef(null);
+    const fileInputRef = useRef(null);
 
-    const submit = (event) => {
+    const canSend = Boolean(value?.trim()) && !isWorking;
+
+    const handleSubmit = useCallback((event) => {
         event.preventDefault();
-        if (!ensureModel()) return;
-        onSubmit(event);
-    };
-
-    const handleComposerKeyDown = (event) => {
-        if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) {
-            event.preventDefault();
-            if (isGenerating) {
-                onAbort?.();
-                return;
-            }
-            if (isWorking || !ensureModel()) return;
-            onSubmit(event);
+        if (isWorking) {
+            onStop?.();
+            return;
         }
-    };
+        if (!disableModelGate && !hasTextModel) {
+            onShowModelModal?.();
+            return;
+        }
+        if (!canSend) return;
+        onSubmit();
+    }, [canSend, disableModelGate, hasTextModel, isWorking, onShowModelModal, onStop, onSubmit]);
 
-    const resizeComposer = (event) => {
+    const handleKeyDown = useCallback((event) => {
+        if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) return;
+        event.preventDefault();
+        handleSubmit(event);
+    }, [handleSubmit]);
+
+    const handleChange = useCallback((event) => {
         const element = event.target;
-        onChatInputChange(element.value);
+        onChange(element.value);
         element.style.height = 'auto';
-        element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
-    };
+        element.style.height = `${Math.min(element.scrollHeight, MAX_COMPOSER_HEIGHT)}px`;
+    }, [onChange]);
 
-    const modelLabel = selectedTextModel ? getTextModelLabel(selectedTextModel) : t('workspace.model.noModelSelected');
+    const handlePasteOrPick = useCallback((event) => {
+        const file = event.target.files?.[0];
+        if (file) onPickAttachment?.(file);
+        event.target.value = '';
+    }, [onPickAttachment]);
 
     return (
         <div className="workspace-chat-container">
-            {isIterating && <div className="iteration-status animate-fadeIn"><span>{t('workspace.iterating')}</span></div>}
+            {isIterating && showIterationStatus && (
+                <div className="iteration-status animate-fadeIn">
+                    <Loader variant="dots" size="xs" />
+                    <span>{t('workspace.iterating')}</span>
+                </div>
+            )}
 
             <div className="chat-utility-row">
                 <div className="task-mode-row">
-                    <button type="button" className={`task-mode-btn ${creativeTaskMode === 'edit_template' ? 'active' : ''}`} onClick={() => onTaskModeChange('edit_template')}>
-                        {t('workspace.taskMode.editTemplate')}
+                    <button
+                        type="button"
+                        className={`task-mode-btn ${creativeTaskMode === 'edit_template' ? 'active' : ''}`}
+                        onClick={() => onTaskModeChange?.('edit_template')}
+                        aria-pressed={creativeTaskMode === 'edit_template'}
+                    >
+                        {t('workspace.editTemplate')}
                     </button>
-                    <button type="button" className={`task-mode-btn ${creativeTaskMode === 'from_scratch' ? 'active' : ''}`} onClick={() => onTaskModeChange('from_scratch')}>
-                        {t('workspace.taskMode.fromScratch')}
+                    <button
+                        type="button"
+                        className={`task-mode-btn ${creativeTaskMode === 'from_scratch' ? 'active' : ''}`}
+                        onClick={() => onTaskModeChange?.('from_scratch')}
+                        aria-pressed={creativeTaskMode === 'from_scratch'}
+                    >
+                        {t('workspace.fromScratch')}
                     </button>
                 </div>
-                <button type="button" className={`chat-model-btn ${selectedTextModel ? '' : 'needs-selection'}`} onClick={onShowModelModal} title={modelLabel}>
-                    {modelLabel}
+
+                <button
+                    type="button"
+                    className={`chat-model-btn ${hasTextModel ? '' : 'needs-selection'}`}
+                    onClick={onShowModelModal}
+                    title={t('workspace.model.change')}
+                    aria-label={t('workspace.model.change')}
+                >
+                    <Icon src={ICONS.CONFIG} size="xs" alt="" />
+                    <span>{modelLabel}</span>
                 </button>
-                {!isPro && <button type="button" className="chat-pro-cta-mini" onClick={onShowProModal}>PRO</button>}
+
+                {!isPro && (
+                    <button
+                        type="button"
+                        className="chat-pro-cta-mini"
+                        onClick={onShowProModal}
+                        title={t('pro.cta')}
+                    >
+                        <span>{t('pro.mini')}</span>
+                    </button>
+                )}
             </div>
 
             {attachedMedia && (
                 <div className="chat-attachment-preview animate-fadeInUp">
-                    <img src={attachedMedia.dataUrl || attachedMedia.data} alt={attachedMedia.name} />
-                    <button className="remove-attach" onClick={onRemoveAttach} aria-label={t('common.remove')}><Icon src={ICONS.CLOSE} size="xs" alt="" /></button>
+                    <img src={attachedMedia.data} alt={t('workspace.attachedImage')} />
+                    <button
+                        type="button"
+                        className="remove-attach"
+                        onClick={onRemoveAttachment}
+                        aria-label={t('common.remove')}
+                    >
+                        <Icon src={ICONS.CLOSE} size="xs" alt="" />
+                    </button>
                 </div>
             )}
 
-            {activeAssetIds.length > 0 && (
+            {activeAssets.length > 0 && (
                 <div className="active-assets-row">
-                    {activeAssetIds.map((assetId) => {
-                        const asset = mediaAssets.find((item) => item.id === assetId);
-                        if (!asset) return null;
-                        return <span key={assetId} className="active-asset-chip" title={asset.name}>{getAssetRoleLabel(asset.role)}: {asset.name?.substring(0, 15)}</span>;
-                    })}
+                    {activeAssets.map((asset) => (
+                        <button
+                            key={asset.id}
+                            type="button"
+                            className="active-asset-chip"
+                            onClick={() => onToggleActiveAsset(asset.id)}
+                            title={t('workspace.media.using')}
+                        >
+                            <span>{asset.roleLabel}</span>
+                            <span>{asset.name}</span>
+                        </button>
+                    ))}
                 </div>
             )}
 
-            <form className={`chat-input-wrapper ${isWorking && isIterating ? 'form-loading' : ''}`} onSubmit={submit}>
-                <button type="button" className="chat-import-btn" onClick={() => chatFileInputRef.current?.click()} aria-label={t('workspace.media.attach')}>
-                    <Icon src={ICONS.IMPORT} size="sm" alt="" />
+            <form className={`chat-input-wrapper ${isWorking && isIterating ? 'form-loading' : ''}`} onSubmit={handleSubmit}>
+                <button
+                    type="button"
+                    className="chat-import-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    title={t('workspace.media.attach')}
+                    aria-label={t('workspace.media.attach')}
+                >
+                    <Icon src={ICONS.IMPORT} size="xs" alt="" />
                 </button>
-                <input ref={chatFileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onAttachFile} />
+                <input
+                    ref={fileInputRef}
+                    className="oc-chat-file-input"
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handlePasteOrPick}
+                />
+
                 <textarea
+                    ref={textareaRef}
                     className="chat-input"
                     rows={1}
-                    value={chatInput}
-                    onChange={resizeComposer}
-                    onKeyDown={handleComposerKeyDown}
-                    placeholder={t('workspace.chatPlaceholder')}
-                    disabled={isWorking && !isGenerating}
-                    autoFocus
+                    value={value}
+                    onChange={handleChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t('workspace.askChanges')}
+                    disabled={isWorking}
+                    aria-label={t('workspace.askChanges')}
                 />
+
                 <button
-                    type={isGenerating ? 'button' : 'submit'}
-                    className={`chat-send-btn ${isGenerating ? 'stop' : ''}`}
-                    onClick={isGenerating ? onAbort : undefined}
-                    disabled={!isGenerating && (isWorking || !chatInput.trim())}
-                    aria-label={isGenerating ? t('workspace.stop') : t('workspace.send')}
+                    type="submit"
+                    className={`chat-send-btn ${isWorking ? 'stop' : ''}`}
+                    disabled={!isWorking && !canSend}
+                    aria-label={isWorking ? t('common.stop') : t('common.send')}
+                    title={isWorking ? t('common.stop') : t('common.send')}
                 >
-                    <Icon src={isGenerating ? ICONS.STOP : ICONS.EXECUTE} size="sm" alt="" />
+                    <Icon src={isWorking ? ICONS.STOP : ICONS.EXECUTE} size="sm" alt="" />
                 </button>
             </form>
+
             <div className="chat-input-hint">{t('ux.composerHint')}</div>
+            {footer}
         </div>
     );
 }

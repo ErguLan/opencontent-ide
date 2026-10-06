@@ -1,24 +1,28 @@
 import { useState } from 'react';
 import Button from '../../../components/common/Button';
 import Icon, { ICONS } from '../../../components/icons/Icon';
+import { AGENTIC_STEP_STATUS } from '../../../services/ai/agenticPipeline';
 import './ArtifactPanel.css';
 
 const APPROVAL_STATUSES = new Set(['pending', 'pending_save', 'awaiting_approval', 'approval_required']);
-const STATUS_KEYS = {
-    pending: 'pending',
-    pending_save: 'pending',
-    awaiting_approval: 'pending',
-    approval_required: 'pending',
+
+/** Artifact status labels follow the same vocabulary as the agent steps. */
+const ARTIFACT_STATUS_LABEL_KEYS = Object.freeze({
+    pending: 'waiting',
+    pending_save: 'waiting',
+    awaiting_approval: 'waiting',
+    approval_required: 'waiting',
     working: 'working',
-    generating: 'generating',
+    generating: 'working',
     completed: 'completed',
-    complete: 'complete',
-    done: 'done',
+    complete: 'completed',
+    failed: 'error',
     error: 'error',
     approved: 'approved',
     discarded: 'discarded',
-    waiting: 'waiting'
-};
+    waiting: 'waiting',
+    skipped: 'skipped'
+});
 
 const STEP_TYPE_KEYS = ['text', 'image', 'analyze', 'tool', 'chat'];
 
@@ -31,11 +35,11 @@ function getArtifactImage(artifact) {
 }
 
 function getArtifactStatus(artifact) {
-    return String(artifact?.status || 'completed').toLowerCase();
+    return String(artifact?.status || AGENTIC_STEP_STATUS.COMPLETED).toLowerCase();
 }
 
 function getStatusLabel(status, translate) {
-    const statusKey = STATUS_KEYS[status];
+    const statusKey = ARTIFACT_STATUS_LABEL_KEYS[status];
     return statusKey
         ? translate(`workspace.artifacts.statuses.${statusKey}`)
         : status;
@@ -318,14 +322,14 @@ function ArtifactPanel({
                 ) : (
                     <ol className="oc-artifact-panel-step-list" aria-live="polite">
                         {steps.map((step, index) => {
-                            const status = String(step?.status || 'waiting').toLowerCase();
+                            const status = String(step?.status || AGENTIC_STEP_STATUS.WAITING).toLowerCase();
                             const type = getStepTypeLabel(step?.type, translate);
                             return (
                                 <li className={`oc-artifact-panel-step status-${status.replace(/[^a-z0-9_-]/gi, '-')}`} key={step?.id ?? `step-${index}`}>
                                     <span className="oc-artifact-panel-step-marker" aria-hidden="true">
-                                        {status === 'completed' || status === 'complete' || status === 'done'
+                                        {status === AGENTIC_STEP_STATUS.COMPLETED
                                             ? <Icon src={ICONS.CHECK} size="xs" alt="" />
-                                            : status === 'error'
+                                            : status === AGENTIC_STEP_STATUS.FAILED
                                                 ? <Icon src={ICONS.INFO} size="xs" alt="" />
                                                 : <span />}
                                     </span>

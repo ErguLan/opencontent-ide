@@ -32,8 +32,16 @@ jobs:
       - name: Check for branding leaks
         run: |
           echo "Checking for proprietary branding leaks..."
-          if grep -rIl "Yoll\|TLUK\|HoneyCopper\|yollsite" src/ --include="*.js" --include="*.jsx" --include="*.json" --include="*.css" 2>/dev/null; then
-            echo "ERROR: Proprietary branding found in source files!"
+          # OpenContent was donated to the open source community, so the single
+          # allowed mention is the donation credit in the About section. It is
+          # declared on the line that carries the "donatedBy" key and is
+          # excluded explicitly; every other occurrence is a leak.
+          leaks=$(grep -rIn "Yoll\|TLUK\|HoneyCopper\|yollsite" src/ \
+            --include="*.js" --include="*.jsx" --include="*.json" --include="*.css" 2>/dev/null \
+            | grep -v '"donatedBy"' || true)
+          if [ -n "$leaks" ]; then
+            echo "ERROR: Proprietary branding found in source files:"
+            echo "$leaks"
             exit 1
           fi
           echo "No branding leaks found."

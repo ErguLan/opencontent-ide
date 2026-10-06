@@ -1,6 +1,11 @@
-export { default as MediaPanel } from './MediaPanel';
-export { default as WorkspaceCanvas } from './WorkspaceCanvas';
+export { default as BatchMode, BatchButton } from './BatchMode';
 export { default as ChatInput } from './ChatInput';
-export { default as WorkspaceToolbar } from './WorkspaceToolbar';
+export { default as ContentCalendar, CalendarToggle } from './ContentCalendar';
 export { default as CopyAsApiModal } from './CopyAsApiModal';
-export { default as ArtifactPanel } from './ArtifactPanel';
+export { default as ModelSelectionModal } from './ModelSelectionModal';
+export { default as OpenInIdeModal } from './OpenInIdeModal';
+export { NoticeModal, PaywallModal, ProModal } from './WorkspaceModals';
+export { default as WorkspaceCanvas } from './WorkspaceCanvas';
+export { default as WorkspaceHeader } from './WorkspaceHeader';
+export { default as WorkspaceSidebar } from './WorkspaceSidebar';
+export { default as WorkspaceToolbar } from './WorkspaceToolbar';

@@ -165,6 +165,48 @@ export async function generateImage(prompt, model, options = {}, retries = 3, de
     }
 }
 
+/**
+ * Lists the models the configured key can reach.
+ * Only real data returned by the API is forwarded: OpenAI does not report
+ * modalities or context size here, so those stay null and the caller must
+ * not invent them.
+ */
+export async function listModels({ apiKey, baseUrl, signal } = {}) {
+    let key;
+    try {
+        key = getKey({ apiKey });
+    } catch {
+        return { success: false, error: 'API_KEY_NOT_CONFIGURED', reason: 'API_KEY_REQUIRED' };
+    }
+    const base = String(baseUrl || BASE_URL).replace(/\/$/, '');
+    try {
+        const response = await fetch(`${base}/models`, {
+            headers: { Authorization: `Bearer ${key}` },
+            signal
+        });
+        if (!response.ok) {
+            return { success: false, status: response.status, error: await getErrorMessageFromResponse(response) };
+        }
+        const data = await response.json();
+        const entries = Array.isArray(data?.data) ? data.data : [];
+        return {
+            success: true,
+            models: entries
+                .map((entry) => ({
+                    id: entry?.id,
+                    displayName: null,
+                    ownedBy: entry?.owned_by ?? null,
+                    contextWindow: null,
+                    inputModalities: null,
+                    outputModalities: null
+                }))
+                .filter((entry) => typeof entry.id === 'string' && entry.id.trim())
+        };
+    } catch (error) {
+        return { success: false, error: normalizeError(error) };
+    }
+}
+
 export async function analyzeImage(imageUrl, prompt = 'Describe this image in detail', options = {}) {
     if (!options.visionModel) return { success: false, error: 'VISION_MODEL_NOT_SELECTED' };
     const result = await send(prompt, options.visionModel, {

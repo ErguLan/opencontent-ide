@@ -1,7 +1,7 @@
 {
   "name": "opencontent-ide",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.9.5",
   "description": "Open source AI content creation IDE. Self-hosted, BYOK, Ollama-compatible.",
   "type": "module",
   "bin": {
@@ -22,9 +22,7 @@
     "mcp:start": "node mcp/index.js",
     "mcp:artifacts": "node mcp/artifacts.js",
     "cli": "node cli/index.js",
-    "cli:artifacts": "node cli/artifacts.js",
-    "rust:check": "cd rust/oc-core && cargo check",
-    "rust:test": "cd rust/oc-core && cargo test"
+    "cli:artifacts": "node cli/artifacts.js"
   },
   "dependencies": {
     "react": "^19.2.0",

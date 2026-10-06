@@ -39,4 +39,18 @@ describe('i18n', () => {
         const section = getSection('common');
         expect(section.close).toBe('Close');
     });
+
+    it('keeps the imageArtifact keys in parity between English and Spanish', () => {
+        const flatten = (value, prefix = '') => Object.entries(value)
+            .flatMap(([key, child]) => (child && typeof child === 'object' ? flatten(child, `${prefix}${key}.`) : [`${prefix}${key}`]))
+            .sort();
+        expect(flatten(getSection('imageArtifact', 'en'))).toEqual(flatten(getSection('imageArtifact', 'es')));
+        expect(flatten(getSection('imageArtifact', 'en')).length).toBeGreaterThan(0);
+    });
+
+    it('resolves the image artifact labels the studio renders', () => {
+        expect(t('imageArtifact.regenerate', {}, 'en')).toBe('Regenerate image');
+        expect(t('imageArtifact.regenerate', {}, 'es')).toBe('Regenerar imagen');
+        expect(t('imageArtifact.assetId', { id: 'asset_1' }, 'en')).toContain('asset_1');
+    });
 });

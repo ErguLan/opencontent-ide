@@ -69,12 +69,83 @@ export function addModel(model) {
     if (!next.id) throw new Error('Model ID is required');
     if (!Object.values(PROVIDERS).includes(next.provider)) throw new Error('Provider is required');
     if (next.provider === PROVIDERS.CUSTOM && !next.baseUrl) throw new Error('Custom provider URL is required');
+    // A model with no capability can never be offered in any selector, so
+    // storing one only creates a dead registry entry. Capabilities are always
+    // an explicit user decision and at least one is required to be useful.
+    if (!Object.values(next.capabilities).some(Boolean)) {
+        throw createRegistryError('MODEL_CAPABILITIES_REQUIRED', 'At least one capability is required');
+    }
     if (models.some((m) => m.id === next.id)) {
         throw new Error(`Model ${next.id} already exists`);
     }
     models.push(next);
     saveModels(models);
     return next;
+}
+
+function createRegistryError(code, message) {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+}
+
+/**
+ * Registers a batch of discovered model IDs in one write.
+ *
+ * Discovered entries only prove that the model exists on the account; they
+ * never prove what it can do. Capabilities must be passed explicitly, so
+ * this stays an explicit user decision. IDs already in the registry (or
+ * repeated inside the batch) are reported as skipped instead of overwriting.
+ * `isBuiltIn` is always false: nothing here is bundled with the app.
+ */
+export function addModelsFromDiscovery(entries, options = {}) {
+    const provider = options.provider || '';
+    const baseUrl = options.baseUrl?.trim() || '';
+    const type = options.type || MODEL_TYPES.TEXT;
+    const capabilities = {
+        text: Boolean(options.capabilities?.text),
+        imageGeneration: Boolean(options.capabilities?.imageGeneration),
+        vision: Boolean(options.capabilities?.vision),
+        toolCalling: Boolean(options.capabilities?.toolCalling),
+        imageEditing: Boolean(options.capabilities?.imageEditing)
+    };
+    if (!Object.values(PROVIDERS).includes(provider)) {
+        throw createRegistryError('MODEL_PROVIDER_REQUIRED', 'Provider is required');
+    }
+    if (provider === PROVIDERS.CUSTOM && !baseUrl) {
+        throw createRegistryError('MODEL_BASE_URL_REQUIRED', 'Custom provider URL is required');
+    }
+    if (!Object.values(capabilities).some(Boolean)) {
+        throw createRegistryError('MODEL_CAPABILITIES_REQUIRED', 'At least one capability is required');
+    }
+
+    const models = getStoredModels();
+    const known = new Set(models.map((model) => model.id));
+    const added = [];
+    const skipped = [];
+    for (const entry of Array.isArray(entries) ? entries : []) {
+        const id = typeof entry === 'string' ? entry.trim() : (entry?.id?.trim() || '');
+        if (!id || known.has(id)) {
+            if (id) skipped.push(id);
+            continue;
+        }
+        const nickname = typeof entry === 'string' ? '' : (entry?.nickname?.trim() || '');
+        const next = {
+            id,
+            nickname: nickname || options.nickname?.trim() || id,
+            provider,
+            type,
+            capabilities: { ...capabilities },
+            baseUrl,
+            requestFormat: options.requestFormat || 'openai-compatible',
+            isBuiltIn: false
+        };
+        models.push(next);
+        known.add(id);
+        added.push(next);
+    }
+    if (added.length > 0) saveModels(models);
+    return { added, skipped };
 }
 
 export function removeModel(id) {
