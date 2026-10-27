@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve, basename, extname, relative, delimiter } from 'node:path';
 import { readFileSync, mkdirSync, writeFileSync, readdirSync, statSync, copyFileSync, existsSync } from 'node:fs';
 import { EDITOR_CONTEXT } from '../server/lib/editorContext.js';
+import { runAssetWorker } from './asset-worker.js';
 import { parseDiagramDsl, diagramToSvg } from '../src/services/artifacts/diagramEngine.js';
 import { documentFromText, serializeDocumentToPdf } from '../src/services/artifacts/pdfEngine.js';
 
@@ -22,7 +23,7 @@ const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf8'));
 const DEFAULT_OUTPUT = resolve(process.env.OC_OUTPUT_DIR || join(process.cwd(), 'opencontent-artifacts'));
 const GALLERY_DIR = resolve(process.env.OC_GALLERY_DIR || join(process.cwd(), 'gallery'));
 const TIMEOUT_MS = Number(process.env.OC_API_TIMEOUT_MS) || 60000;
-const COMMAND_NAMES = ['help','status','doctor','model','generate','ask-editor','image','agent','gallery','project','artifact','diagram','document','pdf','clear','exit'];
+const COMMAND_NAMES = ['help','status','doctor','model','generate','ask-editor','image','asset','agent','gallery','project','artifact','diagram','document','pdf','clear','exit'];
 
 let apiBase = process.env.OC_API_URL || 'http://localhost:4000';
 let mode = { json: false, quiet: false, verbose: process.env.OC_DEBUG_LOGS === 'true' };
@@ -140,6 +141,7 @@ function help(command) {
     const rows = [
         ['generate <prompt> [--model id --provider name]', 'Generate text through the remote API'],
         ['image <prompt> [-o dir --name file]', 'Generate and save an image'],
+        ['asset --request file.json --result file.json', 'Standalone image generation without the API server'],
         ['agent <prompt>', 'Run the coordinated remote agent'],
         ['diagram "A -> B; B -> C" [-o file.svg]', 'Create a local structured diagram'],
         ['document <text> [-o file.pdf]', 'Create a local PDF document'],
@@ -329,6 +331,11 @@ async function run(command, tokens, interactive = false) {
         case 'generate': return generate(tokens);
         case 'ask-editor': return generate(tokens, EDITOR_CONTEXT);
         case 'image': return image(tokens);
+        case 'asset': {
+            const code = await runAssetWorker(tokens);
+            if (code) throw new CliError('Asset generation failed; inspect the result file.', 'ASSET_WORKER_FAILED');
+            return;
+        }
         case 'agent': return agent(tokens);
         case 'gallery': return gallery(tokens);
         case 'diagram': return diagram(tokens);

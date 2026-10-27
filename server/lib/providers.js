@@ -22,15 +22,15 @@ const BASE_URLS = {
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const PROVIDER_TIMEOUT_MS = Number(process.env.OC_PROVIDER_TIMEOUT_MS) || 45000;
 
-async function fetchWithTimeout(url, options, provider) {
+async function fetchWithTimeout(url, options, provider, timeoutMs = PROVIDER_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
         return await fetch(url, { ...options, signal: controller.signal });
     } catch (error) {
         if (error?.name === 'AbortError') {
-            throw new Error(`${provider.toUpperCase()}_TIMEOUT_${PROVIDER_TIMEOUT_MS}MS`);
+            throw new Error(`${provider.toUpperCase()}_TIMEOUT_${timeoutMs}MS`);
         }
         throw error;
     } finally {
@@ -389,20 +389,20 @@ export async function sendToProvider({ prompt, model, provider, skill, systemPro
 
 async function generateOpenAIImage({ provider, prompt, model, options, baseUrl, apiKey }) {
     const endpoint = baseUrl.replace(/\/$/, '');
-    const response = await fetch(`${endpoint}/images/generations`, {
+    const response = await fetchWithTimeout(`${endpoint}/images/generations`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {})
         },
         body: JSON.stringify({ ...options, model, prompt, n: 1 })
-    });
+    }, provider, 240000);
     if (!response.ok) throw new Error(`${provider.toUpperCase()}_${await readError(response)}`);
     const data = await response.json();
     const first = data.data?.[0];
     const imageUrl = first?.url || (first?.b64_json ? `data:${first.media_type || 'image/png'};base64,${first.b64_json}` : null);
     if (!imageUrl) throw new Error('NO_IMAGE_IN_RESPONSE');
-    return { success: true, imageUrl, data, model, provider };
+    return { success: true, imageUrl, model, provider };
 }
 
 async function generateGoogleImage({ prompt, model, options, apiKey }) {
@@ -445,6 +445,7 @@ function extractOpenRouterImage(data) {
     const candidates = Array.isArray(message.images) ? message.images : [];
     for (const candidate of candidates) {
         const url = candidate?.image_url?.url || candidate?.url;
+        if (typeof url === 'string' && url.startsWith('data:image/')) return url;
         if (isHttpUrl(url)) return url;
         const dataUrl = toImageDataUrl(candidate?.b64_json || candidate?.base64 || candidate?.data, candidate?.mime_type);
         if (dataUrl) return dataUrl;
@@ -466,8 +467,32 @@ function extractOpenRouterImage(data) {
     return null;
 }
 
-async function generateOpenRouterImage({ prompt, model, options, apiKey }) {
-    const response = await fetch(`${BASE_URLS.openrouter}/chat/completions`, {
+async function generateOpenRouterImage({ prompt, model, options, apiKey, baseUrl }) {
+    const base = (baseUrl || BASE_URLS.openrouter).replace(/\/$/, '');
+    const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+    const catalogResponse = await fetchWithTimeout(`${base}/images/models`, { headers }, 'openrouter');
+    if (!catalogResponse.ok) throw new Error(`OPENROUTER_DISCOVERY_${await readError(catalogResponse)}`);
+    const catalog = await catalogResponse.json();
+    let capabilities = catalog.data?.find((entry) => entry.id === model);
+    const dedicated = Boolean(capabilities);
+    if (!dedicated) {
+        const generalResponse = await fetchWithTimeout(`${base}/models`, { headers }, 'openrouter');
+        if (!generalResponse.ok) throw new Error(`OPENROUTER_DISCOVERY_${await readError(generalResponse)}`);
+        capabilities = (await generalResponse.json()).data?.find((entry) => entry.id === model);
+    }
+    if (!capabilities?.architecture?.output_modalities?.includes('image')) {
+        throw new Error('SELECTED_MODEL_DOES_NOT_ADVERTISE_IMAGE_OUTPUT');
+    }
+    const supported = capabilities.supported_parameters || {};
+    const accepted = Object.fromEntries(Object.entries(options).filter(([key, value]) => {
+        const descriptor = supported[key];
+        return descriptor && (descriptor.type !== 'enum' || descriptor.values?.includes(value));
+    }));
+    const body = dedicated ? { model, prompt, ...accepted } : {
+        model, modalities: capabilities.architecture.output_modalities.filter((item) => ['text', 'image'].includes(item)),
+        messages: [{ role: 'user', content: prompt }],
+    };
+    const response = await fetchWithTimeout(`${base}/${dedicated ? 'images' : 'chat/completions'}`, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -475,37 +500,40 @@ async function generateOpenRouterImage({ prompt, model, options, apiKey }) {
             'HTTP-Referer': 'https://opencontent-ide.github.io',
             'X-Title': 'OpenContent IDE API'
         },
-        body: JSON.stringify({
-            model,
-            modalities: ['image'],
-            messages: [{ role: 'user', content: prompt }],
-            ...(options?.size ? { size: options.size } : {}),
-            ...(options?.quality ? { quality: options.quality } : {})
-        })
-    });
+        body: JSON.stringify(body)
+    }, 'openrouter', 240000);
     if (!response.ok) throw new Error(`OPENROUTER_${await readError(response)}`);
     const data = await response.json();
-    const imageUrl = extractOpenRouterImage(data);
+    const image = data.data?.[0];
+    const imageUrl = image?.b64_json
+        ? `data:${image.media_type || 'image/png'};base64,${image.b64_json}` : extractOpenRouterImage(data);
     if (!imageUrl) throw new Error('NO_IMAGE_IN_RESPONSE');
-    return { success: true, imageUrl, data, model, provider: 'openrouter' };
+    return { success: true, imageUrl, model, provider: 'openrouter', capabilities: capabilities.architecture };
 }
 
-export async function generateImageProvider({ prompt, model, provider, options = {}, baseUrl }) {
+export async function generateImageProvider({ prompt, model, provider, options = {}, baseUrl, apiKey: requestApiKey }) {
     const selectedProvider = getProvider(provider, model);
     const selectedModel = ensureModel(model);
     if (selectedProvider === 'ollama' || selectedProvider === 'anthropic') {
         throw new Error('IMAGE_GENERATION_NOT_SUPPORTED');
     }
-    const apiKey = getKey(selectedProvider);
+    if (baseUrl) {
+        const url = new URL(baseUrl);
+        if (url.username || url.password || (url.protocol !== 'https:'
+            && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) {
+            throw new Error('PROVIDER_ENDPOINT_REQUIRES_HTTPS_OR_LOCAL_HTTP');
+        }
+    }
+    const apiKey = requestApiKey || getKey(selectedProvider);
     if (selectedProvider === 'openrouter') {
-        return generateOpenRouterImage({ prompt, model: selectedModel, options, apiKey });
+        return generateOpenRouterImage({ prompt, model: selectedModel, options, apiKey, baseUrl });
     }
     if (selectedProvider === 'google') {
         return generateGoogleImage({ prompt, model: selectedModel, options, apiKey });
     }
     const endpoint = selectedProvider === 'custom'
         ? (typeof (baseUrl || BASE_URLS.custom) === 'string' ? (baseUrl || BASE_URLS.custom).replace(/\/$/, '') : '')
-        : BASE_URLS[selectedProvider];
+        : (baseUrl || BASE_URLS[selectedProvider]);
     if (!endpoint) throw new Error('CUSTOM_PROVIDER_URL_NOT_CONFIGURED');
     return generateOpenAIImage({ provider: selectedProvider, prompt, model: selectedModel, options, baseUrl: endpoint, apiKey });
 }

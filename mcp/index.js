@@ -22,6 +22,7 @@ import { mkdir, readdir, stat, writeFile, copyFile, readFile } from 'node:fs/pro
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { sendToProvider, generateImageProvider } from '../server/lib/providers.js';
+import { generateImageFile } from '../server/lib/imageFiles.js';
 import { runAgenticCycle } from '../server/lib/agentic.js';
 import { EDITOR_CONTEXT } from '../server/lib/editorContext.js';
 
@@ -214,6 +215,17 @@ const TOOLS = [
         }
     },
     {
+        name: 'generate_image_file',
+        description: 'Generate and deliver a validated PNG in the configured MCP output directory, without a browser or API server. Requires OC_ALLOW_LOCAL_WRITES=true. Does not change model settings.',
+        inputSchema: {
+            type: 'object', additionalProperties: false,
+            properties: {
+                prompt: { type: 'string' }, model: { type: 'string' }, provider: { type: 'string' },
+                filename: { type: 'string' }, size: { type: 'string' }, transparent: { type: 'boolean' }
+            }, required: ['prompt', 'model', 'provider', 'filename']
+        }
+    },
+    {
         name: 'save_image',
         description: 'Save a generated image to the explicitly configured MCP output directory.',
         inputSchema: {
@@ -312,6 +324,16 @@ async function getOllamaModels() {
 // Tool handlers
 async function handleToolCall(name, args) {
     switch (name) {
+        case 'generate_image_file': {
+            if (process.env.OC_ALLOW_LOCAL_WRITES !== 'true') throw new Error('LOCAL_WRITES_DISABLED');
+            const filename = sanitizeFilename(args.filename, 'image.png');
+            const outputPath = path.resolve(OUTPUT_DIR, filename);
+            const result = await generateImageFile({
+                prompt: args.prompt, model: args.model, output_path: outputPath,
+                metadata_path: `${outputPath}.asset.json`, size: args.size, transparent: args.transparent,
+            }, { provider: args.provider });
+            return [{ type: 'text', text: JSON.stringify(result) }];
+        }
         case 'generate_content': {
             const skill = SKILLS.find(s => s.id === (args.skill || 'content-creator')) || SKILLS[0];
             const resolved = await resolveModelArgs(args);

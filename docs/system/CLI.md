@@ -5,7 +5,7 @@
 The CLI has two modes:
 
 1. **In-browser CLI** — React route at `/cli`, a terminal UI over `CliEngine`.
-2. **Standalone CLI** — Node.js processes at `cli/index.js` and `cli/artifacts.js`. They forward generation to the Express API.
+2. **Standalone CLI** — Node.js processes at `cli/index.js` and `cli/artifacts.js`. Ordinary generation forwards to Express; the `asset` worker also supports direct provider generation without a server.
 
 ## CliEngine (`CliEngine.js`)
 
@@ -108,6 +108,7 @@ Its command set is **not** the browser set:
 | `generate <prompt>` | Text generation |
 | `ask-editor <prompt>` | Generation with an editor-oriented context |
 | `image <prompt>` | Image generation |
+| `asset --request file.json --result file.json` | Direct image generation and verified PNG delivery; Node 20+, no browser, Express or dependency install required |
 | `agent <prompt>` | Agentic pipeline |
 | `gallery …` | Filesystem gallery operations |
 | `diagram …`, `document …`, `pdf create …` | Artifact operations on files |
@@ -130,6 +131,35 @@ Filesystem access is opt-in and narrow:
 With `OC_ALLOW_LOCAL_WRITES` unset the CLI runs read-only and reports a refusal instead of writing. Cloning never moves or deletes the source asset.
 
 ## Notes
+
+### External asset worker
+
+`node cli/asset-worker.js --request <absolute JSON> --result <absolute JSON>`
+is the direct entry point for an independently installed studio. An external
+agent may shallow-clone this repository, explicitly select a provider/model,
+invoke the CLI and retrieve its files without embedding OpenContent in another
+application. The same entry is available as `opencontent asset ...`.
+
+The caller explicitly supplies `prompt`, `model`, `size`, `transparent`,
+`output_path` (PNG) and `metadata_path` (JSON) in its request. Both output paths
+must be absolute, in the same directory, and not already exist. Credential
+variables are `RAF_IMAGE_PROVIDER`, `RAF_IMAGE_BASE_URL`, `RAF_IMAGE_API_KEY`.
+They are per-process inputs, not model registry changes or browser settings.
+Standard provider key environment variables remain supported for standalone use.
+Do not place API keys in request JSON, command arguments or repository files.
+
+The worker validates PNG format/dimensions and returns `{ok, image_path,
+metadata_path, model, provider, width, height}` or `{ok:false,error}`. It does
+not auto-select models, fall back to another provider, overwrite images, start
+an Express server or persist credentials. Native OpenRouter image endpoint
+capabilities are discovered before generation. JPEG/WebP/SVG results are
+rejected rather than mislabeled as PNG. The existing browser workflows are
+unchanged.
+
+The standalone MCP server exposes `generate_image_file` with the same shared
+delivery implementation. MCP writes require `OC_ALLOW_LOCAL_WRITES=true` and
+are restricted to `OC_OUTPUT_DIR`; model/provider/filename must be explicit.
+The low-level file worker instead uses the caller's explicit absolute paths.
 
 - The browser CLI and the standalone CLI are separate implementations. A feature added to one is not automatically in the other.
 - `cli/artifacts.js` and `mcp/artifacts.js` expose the artifact engine to Node. Neither can read the browser's IndexedDB; they operate on their own artifact files.
